@@ -23,15 +23,31 @@ public class SoundPlayer : MonoBehaviour
     public void Play() => PlaySound(soundId);
 
     //외부 이벤트에서 받은 ID 재생
-    public void PlaySound(string id)
+    public async void PlaySound(string id)
     {
-        if (soundManager != null) soundManager.Play(id);
-        else GameLogger.LogError("[사운드] SoundPlayer에 재생 관리자를 주입해 주세요", this);
+        SoundManager manager = soundManager;
+        if (manager == null)
+        {
+            GameLogger.LogError("[사운드] SoundPlayer에 재생 관리자를 주입해 주세요", this);
+            return;
+        }
+        //로드 대기 중 씬 종료 또는 비활성화 시 재생 취소
+        int requestVersion = playbackVersion;
+        if (!await manager.InitializeAsync()) return;
+        if (this == null || !isActiveAndEnabled || manager == null ||
+            manager != soundManager || requestVersion != playbackVersion) return;
+        manager.Play(id);
     }
+
+    private int playbackVersion;
+
+    //비활성화 전 요청한 지연 재생 취소
+    private void OnDisable() { playbackVersion++; }
 
     //반복 사운드 정지
     public void Stop()
     {
+        playbackVersion++;
         if (soundManager != null) soundManager.Stop(soundId);
     }
 }

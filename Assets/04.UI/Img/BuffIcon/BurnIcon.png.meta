@@ -1,10 +1,34 @@
 fileFormatVersion: 2
-guid: 8a94e9724e6944f40b61e3e74af99775
+guid: b10aa3d072f0b38438b8038eba7c637b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -366396754397206061
-    second: Spum_Icon21_0
+      213: -632122146342402490
+    second: BurnIcon_0
+  - first:
+      213: -7983266205160038225
+    second: BurnIcon_1
+  - first:
+      213: 6613775773078073821
+    second: BurnIcon_2
+  - first:
+      213: -5956728422156001733
+    second: BurnIcon_3
+  - first:
+      213: 4076813737238279141
+    second: BurnIcon_4
+  - first:
+      213: -102386532997664654
+    second: BurnIcon_5
+  - first:
+      213: 9018088107680659407
+    second: BurnIcon_6
+  - first:
+      213: -7244972459062305881
+    second: BurnIcon_7
+  - first:
+      213: 7732655706529248628
+    second: BurnIcon_8
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -52,7 +76,7 @@ TextureImporter:
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
-  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteBorder: {x: 0, y: 0, z: 282, w: 189}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
@@ -97,19 +121,6 @@ TextureImporter:
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
-    buildTarget: Android
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
     buildTarget: WindowsStoreApps
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -126,23 +137,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Spum_Icon21_0
+      name: BurnIcon_0
       rect:
         serializedVersion: 2
-        x: 4
-        y: 3
-        width: 25
-        height: 26
+        x: 240
+        y: 240
+        width: 770
+        height: 770
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 3d96c47d71c4aeaf0800000000000000
-      internalID: -366396754397206061
+      spriteID: 6468a9cc1404a37f0800000000000000
+      internalID: -632122146342402490
       vertices: []
       indices: 
       edges: []
@@ -151,17 +162,21 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
-    internalID: 0
+    spriteID: 9f8068dd2c3687a45826ea53f39dbe9b
+    internalID: 1900139161
     vertices: []
     indices: 
     edges: []
     weights: []
     secondaryTextures: []
     spriteCustomMetadata:
-      entries: []
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":1004.0,"y":1005.0},"gridSpriteOffset":{"x":250.0,"y":249.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
+      - key: SpriteEditor.SliceOnImport
+        value: False
     nameFileIdTable:
-      Spum_Icon21_0: -366396754397206061
+      BurnIcon_0: -632122146342402490
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

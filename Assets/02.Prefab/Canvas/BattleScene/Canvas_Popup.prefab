@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6491032784672106670}
   - component: {fileID: 5998484732898171857}
   - component: {fileID: 2238053197570656875}
+  - component: {fileID: 8352006837133195699}
   m_Layer: 5
   m_Name: Canvas_Popup
   m_TagString: Untagged
@@ -136,4 +137,18 @@ MonoBehaviour:
   clearPrefab: {fileID: 4888487993125304914, guid: 5093b3b0aa4516c4daeeeae7feddaaff, type: 3}
   coinInstaller: {fileID: 0}
   sceneController: {fileID: 0}
-  menu: {fileID: 0}
+--- !u!114 &8352006837133195699
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1892831876159979008}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b1da25f1d18a4a4d96e5da63070a8b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SettingsPopupSpawner
+  prefab: {fileID: 2488678328878684656, guid: 37078b482d7b15f448a4023a92e09944, type: 3}
+  popupRoot: {fileID: 9122229695130973882}
+  showRunButtons: 1

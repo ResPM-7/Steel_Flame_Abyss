@@ -27,6 +27,15 @@ public class BattleInstaller : MonoBehaviour, IScenePreparation
     [SerializeField] private BattleResultView resultView;
     [SerializeField] private BattlePopupManager popups;
     [SerializeField] private ObjectPoolManager objectPoolManager;
+    [SerializeField] private BattleCardSoundFeedback cardSoundFeedback;
+    private SoundManager soundManager;
+
+    //공통 사운드 관리자와 카드 사용 연출 연결
+    public void InjectSound(SoundManager manager)
+    {
+        soundManager = manager;
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(cardPlayController, manager);
+    }
 
     private CardPlayController cardPlayController;
     private BattleRelicEffects relicEffects;
@@ -54,6 +63,7 @@ public class BattleInstaller : MonoBehaviour, IScenePreparation
     {
         if (deckManager != null) deckManager.BattleStarted -= ApplyStartingRelics;
         cardPlayController?.InjectRelics(null);
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(null, null);
     }
 
 #if UNITY_EDITOR
@@ -91,6 +101,7 @@ public class BattleInstaller : MonoBehaviour, IScenePreparation
         deckManager.Inject(dataProvider);
         participants.Inject(dataProvider, deckManager);
         cardPlayController = new CardPlayController(deckManager, participants);
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(cardPlayController, soundManager);
         cardPlayController.InjectRelics(relicEffects);
         handController.Inject(deckManager, cardPlayController);
         turnController.Inject(deckManager, participants);

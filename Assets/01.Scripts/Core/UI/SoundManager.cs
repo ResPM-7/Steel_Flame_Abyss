@@ -1,8 +1,23 @@
 using UnityEngine;
+using System.Threading.Tasks;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+
+//인스펙터에서 사운드 라이브러리 에셋만 선택
+[System.Serializable]
+public class SoundLibraryReference : AssetReferenceT<SoundLibrary>
+{
+    public SoundLibraryReference(string guid) : base(guid) { }
+}
 
 //게임 세션에 종속된 공통 사운드 재생과 음량 적용
 public class SoundManager : MonoBehaviour
 {
+    [SerializeField] private SoundLibraryReference soundLibrary;
+    private Task<bool> initialization;
+    private AsyncOperationHandle<SoundLibrary> libraryHandle;
+    private bool ownsHandle;
+    private bool disposed;
     private SoundLibrary library;
     private AudioSource bgm;
     private SoundEntry bgmEntry;
@@ -13,6 +28,67 @@ public class SoundManager : MonoBehaviour
     private bool masterInMixer;
     private bool bgmInMixer;
     private bool sfxInMixer;
+
+    //중복 로드 없이 라이브러리 준비 작업 공유
+    public Task<bool> InitializeAsync()
+    {
+        if (disposed) return Task.FromResult(false);
+        if (library != null) return Task.FromResult(true);
+        return initialization ??= LoadLibraryAsync();
+    }
+
+    //어드레서블 라이브러리 로드와 재생 소스 초기화
+    private async Task<bool> LoadLibraryAsync()
+    {
+        if (soundLibrary == null || !soundLibrary.RuntimeKeyIsValid())
+        {
+            GameLogger.LogError("[사운드] Sound Library 어드레서블 참조를 연결해 주세요", this);
+            return false;
+        }
+        try
+        {
+            libraryHandle = Addressables.LoadAssetAsync<SoundLibrary>(soundLibrary.RuntimeKey);
+            ownsHandle = true;
+            SoundLibrary data = await libraryHandle.Task;
+            if (disposed || this == null) return false;
+            if (data == null) throw new System.InvalidOperationException("사운드 라이브러리 로드 실패");
+            Inject(data);
+            return true;
+        }
+        catch (System.Exception error)
+        {
+            if (!disposed) GameLogger.LogError($"[사운드] 초기화 실패: {error.Message}", this);
+            ReleaseLibrary();
+            return false;
+        }
+    }
+
+    //재생 참조 정리 후 라이브러리 소유 핸들 해제
+    private void OnDestroy()
+    {
+        disposed = true;
+        StopBgm();
+        if (effects != null)
+            foreach (AudioSource source in effects)
+            {
+                if (source == null) continue;
+                source.Stop();
+                source.clip = null;
+                source.outputAudioMixerGroup = null;
+            }
+        if (bgm != null) bgm.outputAudioMixerGroup = null;
+        library = null;
+        effectEntries = null;
+        ReleaseLibrary();
+    }
+
+    //로드 중 종료와 실패 경로의 중복 해제 방지
+    private void ReleaseLibrary()
+    {
+        if (!ownsHandle) return;
+        ownsHandle = false;
+        if (libraryHandle.IsValid()) Addressables.Release(libraryHandle);
+    }
 
     //세션에서 사운드 데이터 받음과 재생 소스 준비
     public void Inject(SoundLibrary data)

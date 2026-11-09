@@ -5,6 +5,7 @@ using UnityEngine.SceneManagement;
 [AddComponentMenu("")]
 public class GameSession : MonoBehaviour, IRunSceneLoader
 {
+    private static GameSession activeSession;
     private readonly CoinModel coins = new CoinModel();
     private readonly OwnedDeckModel ownedDeck = new OwnedDeckModel();
     private readonly RunProgressModel run = new RunProgressModel();
@@ -14,26 +15,29 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
     private SoundManager soundManager;
     public bool IsLoading => sceneLoader != null && sceneLoader.IsLoading;
 
-    //첫 씬 로드 전 중복 없는 게임 세션 생성
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    private static void CreateSession()
+    //도메인 재로드 비활성 환경의 이전 세션 참조 초기화
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetSessionReference()
     {
-        if (FindFirstObjectByType<GameSession>() != null) return;
-        new GameObject("GameSession").AddComponent<GameSession>();
+        activeSession = null;
     }
 
     //게임 세션 유지와 공통 씬 로더 및 로드 이벤트 연결
     private void Awake()
     {
+        if (activeSession != null && activeSession != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        activeSession = this;
         DontDestroyOnLoad(gameObject);
-        //세션 자식으로 사운드 관리자 생성과 씬 전환 간 유지
-        var soundObject = new GameObject("SoundManager");
-        soundObject.transform.SetParent(transform, false);
-        soundManager = soundObject.AddComponent<SoundManager>();
-        SoundLibrary sounds = Resources.Load<SoundLibrary>("SoundLibrary");
-        if (sounds != null) soundManager.Inject(sounds);
-        else GameLogger.LogError("[사운드] Resources/SoundLibrary 에셋을 확인해 주세요", this);
-        sceneLoader = gameObject.AddComponent<SceneMenuActions>();
+        //인스펙터에 연결한 관리자 사용과 비동기 사운드 준비
+        soundManager = GetComponent<SoundManager>();
+        if (soundManager != null) _ = soundManager.InitializeAsync();
+        else GameLogger.LogError("[사운드] GameSession 오브젝트에 SoundManager를 추가해 주세요", this);
+        sceneLoader = GetComponent<SceneMenuActions>();
+        if (sceneLoader == null) sceneLoader = gameObject.AddComponent<SceneMenuActions>();
         sceneLoader.InjectNewGameAction(ResetRun);
         SceneManager.sceneLoaded += InjectScene;
     }
@@ -69,6 +73,7 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
                 installer.Inject(coins);
             foreach (BattleInstaller installer in root.GetComponentsInChildren<BattleInstaller>(true))
             {
+                installer.InjectSound(soundManager);
                 installer.InjectOwnedDeck(ownedDeck);
                 installer.InjectOwnedRelics(ownedRelics);
             }
@@ -171,5 +176,6 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= InjectScene;
+        if (activeSession == this) activeSession = null;
     }
 }

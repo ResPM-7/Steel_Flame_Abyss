@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b9bc7cdd587b9d4b805a136499e2c3d, type: 3}
   m_Name: BattleStatusIcons
   m_EditorClassIdentifier: Assembly-CSharp::BattleStatusIcons
-  burn: {fileID: 0}
-  burnRetaliation: {fileID: 0}
-  weak: {fileID: 0}
-  vulnerable: {fileID: 0}
-  mindFracture: {fileID: 0}
-  strength: {fileID: -366396754397206061, guid: 8a94e9724e6944f40b61e3e74af99775, type: 3}
+  burn: {fileID: -632122146342402490, guid: b10aa3d072f0b38438b8038eba7c637b, type: 3}
+  burnRetaliation: {fileID: -3234576059291778508, guid: b4c1b98a002233249aa672f3092e53c3, type: 3}
+  weak: {fileID: -1163524392, guid: 5deaaa754ab9a55489884c1dabdb2fb6, type: 3}
+  vulnerable: {fileID: 7888865854599717151, guid: 1133b41506aff954482f918e3e0d22de, type: 3}
+  mindFracture: {fileID: 7819613628025069169, guid: 4860a1fbb0e27a44e9115a35fe473d13, type: 3}
+  strength: {fileID: -1483206295, guid: 9f79ba15670f1414bb946abe9bdb6a72, type: 3}

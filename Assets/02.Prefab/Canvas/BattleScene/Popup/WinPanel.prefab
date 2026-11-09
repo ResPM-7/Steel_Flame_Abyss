@@ -1247,6 +1247,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8dc75e3c7c21bf40952ac3693ae8cd8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BattleWinPopupView
+  canvasGroup: {fileID: 0}
+  animatedPanel: {fileID: 87993548950613065}
+  showDuration: 0.25
+  hideDuration: 0.18
+  showScale: 0.94
+  hideScale: 0.97
   rewardView: {fileID: 5459943271667461824}
   coinButton: {fileID: 1510612092261385661}
   coinText: {fileID: 6521660180746553188}

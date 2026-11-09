@@ -104,7 +104,7 @@ public class BattlePopupManager : MonoBehaviour
             {
                 winView = Create(winPrefab);
                 coinInstaller.BindRewardView(winView.CoinButton, winView.CoinText);
-                sceneController.BindNextButton(winView.NextButton);
+                sceneController.BindWinPopup(winView);
                 rewardPresenter = new CardRewardPresenter(data, participants, ownedDeck, winView.RewardView, ownedRelics);
             }
             winView.transform.SetAsLastSibling();

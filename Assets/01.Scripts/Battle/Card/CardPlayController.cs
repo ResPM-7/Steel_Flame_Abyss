@@ -7,6 +7,8 @@ public class CardPlayController
     private readonly IBattleDeckManager deckManager;
     private BattleRelicEffects relicEffects;
     private event System.Action costsChanged;
+    //사용 완료 카드와 실제 방어 증가 여부 전달
+    public event System.Action<CardInstance, CharacterClass, bool> CardPlayed;
 
     //유물 교체 시 이전 비용 알림 해제 후 새 효과 연결
     public void InjectRelics(BattleRelicEffects effects)
@@ -183,11 +185,14 @@ public class CardPlayController
         //검증 완료 후 첫 카드 예약 소모, 결제에 따른 상태 알림보다 먼저 반영
         relicEffects?.ConsumeCardDiscount();
         if (payHealth) participants.Player.Stats.LoseHealth(cost);
+        int blockBefore = participants.Player.Stats.Block;
         effectResolver.Resolve(card, selectedEnemy, OnCardHealthLost);
+        bool gainedBlock = participants.Player.Stats.Block > blockBefore;
         bool exhaust = HasExhaustEffect(card);
         if (!deckManager.FinishPlayingCard(card, exhaust))
             return false;
 
+        CardPlayed?.Invoke(card, participants.Player.Data.Class, gainedBlock);
         GameLogger.Log($"[카드 사용] {card.Data.DisplayName} 사용");
         return true;
     }

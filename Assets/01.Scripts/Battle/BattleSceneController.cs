@@ -16,6 +16,14 @@ public class BattleSceneController : MonoBehaviour
     public bool IsFinalBossBattle { get; private set; }
     private RunProgressModel run;
     private IRunSceneLoader loader;
+    private BattleWinPopupView winPopup;
+
+    //동적 승리창의 퇴장 연출과 다음 버튼 연결
+    public void BindWinPopup(BattleWinPopupView popup)
+    {
+        winPopup = popup;
+        BindNextButton(popup.NextButton);
+    }
 
     //세션 진행 데이터와 씬 이동 기능 주입
     public void Inject(RunProgressModel model, IRunSceneLoader sceneLoader)
@@ -51,6 +59,7 @@ public class BattleSceneController : MonoBehaviour
     {
         if (nextButton != null) nextButton.onClick.RemoveListener(ContinueAfterReward);
         nextButton = button;
+        if (nextButton == null) return;
         nextButton.onClick.AddListener(ContinueAfterReward);
         nextButton.interactable = participants.Result == BattleResult.Victory;
     }
@@ -69,8 +78,22 @@ public class BattleSceneController : MonoBehaviour
     public void ContinueAfterReward()
     {
         if (IsFinalBossBattle || loader == null || loader.IsLoading || participants.Result != BattleResult.Victory) return;
+        if (winPopup != null)
+        {
+            winPopup.HideAndContinue(TryContinueAfterReward);
+            return;
+        }
+        TryContinueAfterReward();
+    }
+
+    //페이드아웃 완료 시점의 승리 상태 재검증과 맵 이동
+    private bool TryContinueAfterReward()
+    {
+        if (IsFinalBossBattle || loader == null || loader.IsLoading || participants.Result != BattleResult.Victory) return false;
         run.CaptureHealth(participants.Player.Stats);
-        if (loader.ReturnToMap() && nextButton != null) nextButton.interactable = false;
+        if (!loader.ReturnToMap()) return false;
+        if (nextButton != null) nextButton.interactable = false;
+        return true;
     }
 
     //전투 결과와 다음 버튼 구독 해제
