@@ -10,14 +10,18 @@ public class RelicIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     private RelicData data;
     private RelicPanelView owner;
 
+    //아이콘 우선 표시, 미등록 유물은 흰 배경과 이름 표시
     public void Bind(RelicData value, RelicPanelView panel)
     {
         data = value;
         owner = panel;
-        icon.sprite = null;
+        icon.sprite = value.Icon;
+        icon.overrideSprite = null;
+        icon.type = UnityEngine.UI.Image.Type.Simple;
+        icon.preserveAspect = true;
         icon.color = Color.white;
         fallbackLabel.text = value.DisplayName;
-        fallbackLabel.gameObject.SetActive(true);
+        fallbackLabel.gameObject.SetActive(value.Icon == null);
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -31,6 +35,8 @@ public class RelicIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         owner?.HideTooltip(this);
         owner = null;
         data = null;
+        icon.sprite = null;
+        icon.overrideSprite = null;
         fallbackLabel.text = string.Empty;
     }
 

@@ -24,7 +24,7 @@ MonoBehaviour:
     amount: 3
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: -1181197408, guid: 129887cdfdeb62d4687061940e951c2a, type: 3}
   effectsEnabled: 1
 --- !u!114 &-8598318188735480284
 MonoBehaviour:
@@ -143,7 +143,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 1623360201, guid: 083e2a8f00cb7cf458f929ea664c8408, type: 3}
   effectsEnabled: 1
 --- !u!114 &-7784150875861257247
 MonoBehaviour:
@@ -311,7 +311,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 875101471, guid: bc812107ff977aa4baccb28562fc5e32, type: 3}
   effectsEnabled: 1
 --- !u!114 &-5883576178073374261
 MonoBehaviour:
@@ -430,7 +430,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 1557442461, guid: 3b1b0e9226ffef544a6569c44ca77a46, type: 3}
   effectsEnabled: 1
 --- !u!114 &-4980030412945143332
 MonoBehaviour:
@@ -565,7 +565,7 @@ MonoBehaviour:
     amount: 2
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 233031802, guid: 482883e975ec0ce489a92ed784c4db77, type: 3}
   effectsEnabled: 1
 --- !u!114 &-3451954277001629930
 MonoBehaviour:
@@ -632,7 +632,7 @@ MonoBehaviour:
     amount: 10
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: -2056664586457656802, guid: 74fcce41a13003e47bfb7d44eaf4de0c, type: 3}
   effectsEnabled: 1
 --- !u!114 &-3195875925980084548
 MonoBehaviour:
@@ -658,7 +658,7 @@ MonoBehaviour:
     amount: 5
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 1553717605, guid: 1284c6c88faddeb49ac4966da789f815, type: 3}
   effectsEnabled: 1
 --- !u!114 &-3076726178586581687
 MonoBehaviour:
@@ -1265,7 +1265,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 1866102581, guid: 3e56824cf01f86c4192cc9f233fbee56, type: 3}
   effectsEnabled: 1
 --- !u!114 &1693516754801979686
 MonoBehaviour:
@@ -1392,7 +1392,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: -722417728, guid: 4adb664b3c41f7b46a917abb82d95748, type: 3}
   effectsEnabled: 1
 --- !u!114 &4394696580758261533
 MonoBehaviour:
@@ -1466,7 +1466,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: -772207412, guid: 95be9557aeca43049a9a13066756b7e3, type: 3}
   effectsEnabled: 1
 --- !u!114 &5493224052594263523
 MonoBehaviour:
@@ -1491,7 +1491,7 @@ MonoBehaviour:
     amount: 1
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: -638047838, guid: 7e74e8d9f734edc4c8633c1995ad2129, type: 3}
   effectsEnabled: 1
 --- !u!114 &5895498753706929792
 MonoBehaviour:
@@ -1523,7 +1523,7 @@ MonoBehaviour:
     amount: 2
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 892321526, guid: d30ac1c2d056ed04fabdc7fdf9b86bc3, type: 3}
   effectsEnabled: 1
 --- !u!114 &6126127775062050035
 MonoBehaviour:
@@ -1595,7 +1595,7 @@ MonoBehaviour:
     amount: 5
     secondaryAmount: 0
     duration: 0
-  icon: {fileID: 0}
+  icon: {fileID: 2123264225, guid: b127d597f74fe4045afda745ebcfad40, type: 3}
   effectsEnabled: 1
 --- !u!114 &6923530557049175458
 MonoBehaviour:

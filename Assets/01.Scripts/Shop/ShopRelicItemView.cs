@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 public class ShopRelicItemView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [SerializeField] private UnityEngine.UI.Button button;
+    [SerializeField] private UnityEngine.UI.Image icon;
     [SerializeField] private TMP_Text nameText;
     [SerializeField] private TMP_Text priceText;
     private Action selected;
@@ -21,9 +22,26 @@ public class ShopRelicItemView : MonoBehaviour, IPointerEnterHandler, IPointerEx
         owner = panel;
         selected = onSelected;
         nameText.text = data.DisplayName;
+        RefreshIcon(data);
         button.onClick.RemoveListener(Select);
         button.onClick.AddListener(Select);
         gameObject.SetActive(true);
+    }
+
+    //지정 이미지 또는 버튼 이미지에 아이콘 표시, 미등록 시 이름 표시
+    private void RefreshIcon(RelicData data)
+    {
+        UnityEngine.UI.Image image = icon != null ? icon : button.image;
+        bool hasIcon = image != null && data.Icon != null;
+        if (image != null)
+        {
+            image.sprite = data.Icon;
+            image.overrideSprite = null;
+            image.type = UnityEngine.UI.Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+        }
+        nameText.gameObject.SetActive(!hasIcon);
     }
 
     //가격과 품절 및 중복 보유 상태 반영
