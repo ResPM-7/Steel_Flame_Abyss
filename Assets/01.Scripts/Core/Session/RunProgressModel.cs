@@ -3,6 +3,18 @@ using System;
 //씬과 분리된 체력과 맵 진행 및 전투 진입 정보 보관
 public class RunProgressModel
 {
+    private readonly System.Collections.Generic.Dictionary<int, ShopModel> shopVisits = new System.Collections.Generic.Dictionary<int, ShopModel>();
+
+    //씬 이동과 무관한 상점 상품 및 품절 상태 유지
+    public ShopModel GetShopVisit(int nodeIndex, Func<ShopModel> create)
+    {
+        if (!shopVisits.TryGetValue(nodeIndex, out ShopModel shop))
+        {
+            shop = create();
+            shopVisits.Add(nodeIndex, shop);
+        }
+        return shop;
+    }
     private readonly System.Collections.Generic.Dictionary<int, MapEventVisit> eventVisits = new System.Collections.Generic.Dictionary<int, MapEventVisit>();
 
     //맵 지점별 이벤트 상태 생성과 기존 방문 재사용
@@ -17,10 +29,10 @@ public class RunProgressModel
     public int PlayerId { get; private set; }
     public CombatantState Health { get; private set; }
     public MapProgressModel Map { get; private set; }
-    public int PendingEnemyId { get; private set; }
+    public int PendingEncounterId { get; private set; }
     public bool IsFinalBossBattle { get; private set; }
     public bool IsCleared { get; private set; }
-    public bool HasPendingBattle => PendingEnemyId > 0;
+    public bool HasPendingBattle => PendingEncounterId > 0;
     public float MapScrollX { get; private set; }
     public float MapScrollY { get; private set; }
 
@@ -43,17 +55,15 @@ public class RunProgressModel
     }
 
     //맵 최초 생성과 씬 복귀 시 기존 진행 유지
-    public void PrepareMap(int nodeCount)
+    public void PrepareMap(Func<MapGraphData> create)
     {
-        if (Map != null && Map.NodeCount != nodeCount)
-            throw new InvalidOperationException("맵 지점 수가 변경되었습니다 새 게임을 시작해 주세요");
-        if (Map == null) Map = new MapProgressModel(nodeCount);
+        if (Map == null) Map = new MapProgressModel(create());
     }
 
     //전투 대상과 최종 보스 여부 저장
-    public void SetBattle(int enemyId, bool isFinalBoss = false)
+    public void SetBattle(int encounterId, bool isFinalBoss = false)
     {
-        PendingEnemyId = enemyId;
+        PendingEncounterId = encounterId;
         IsFinalBossBattle = isFinalBoss;
     }
 
@@ -77,7 +87,7 @@ public class RunProgressModel
     //전투 진입 정보 제거
     public void ClearBattle()
     {
-        PendingEnemyId = 0;
+        PendingEncounterId = 0;
         IsFinalBossBattle = false;
     }
 
@@ -85,10 +95,11 @@ public class RunProgressModel
     public void Reset()
     {
         eventVisits.Clear();
+        shopVisits.Clear();
         PlayerId = 0;
         Health = null;
         Map = null;
-        PendingEnemyId = 0;
+        PendingEncounterId = 0;
         IsFinalBossBattle = false;
         IsCleared = false;
         MapScrollX = 0f;
@@ -102,7 +113,7 @@ public interface IRunSceneLoader
     bool IsLoading { get; }
 
     //전투 대상의 비동기 이동 요청
-    bool EnterBattle(int enemyId, bool isFinalBoss = false);
+    bool EnterBattle(int encounterId, bool isFinalBoss = false);
 
     //승리 보상 완료 후 맵 씬 복귀 요청
     bool ReturnToMap();

@@ -7,10 +7,12 @@ public class CharacterData : GameDataEntry
     [SerializeField] private CharacterClass characterClass;
     [Min(1)] [SerializeField] private int maxHealth = 1;
     [Min(0)] [SerializeField] private int startingEnergy = 3;
+    [Tooltip("새 게임 시작 덱 / 같은 ID 반복으로 카드 수량 설정")]
     [SerializeField] private List<int> startingDeckIds = new();
     [SerializeField] private List<int> cardPoolIds = new();
     [SerializeField] private string resourceName;
-    [SerializeField] private Sprite portrait;
+    [Tooltip("전투 시작 시 한 번 생성할 공통 애니메이션 프리팹")]
+    [SerializeField] private GameObject battlePrefab;
 
     public CharacterClass Class => characterClass;
     public int MaxHealth => maxHealth;
@@ -18,7 +20,7 @@ public class CharacterData : GameDataEntry
     public IReadOnlyList<int> StartingDeckIds => startingDeckIds;
     public IReadOnlyList<int> CardPoolIds => cardPoolIds;
     public string ResourceName => resourceName;
-    public Sprite Portrait => portrait;
+    public GameObject BattlePrefab => battlePrefab;
 
 #if UNITY_EDITOR
     //검증이 끝난 캐릭터 시트 한 행을 이 서브에셋에 반영

@@ -45,7 +45,7 @@ internal static class GameDatabaseSheetUpload
             throw new InvalidOperationException($"시트가 업로드 요청을 거부했습니다.\n{response}");
 
         Debug.Log($"[게임 데이터] 시트 업로드 완료: 카드 {database.Cards.Count}, " +
-                  $"캐릭터 {database.Characters.Count}, 적 {database.Enemies.Count}, 유물 {database.Relics.Count}");
+                  $"캐릭터 {database.Characters.Count}, 적 {database.Enemies.Count}, 유물 {database.Relics.Count}, 전투 편성 {database.Encounters.Count}");
     }
 
     private static UploadPayload BuildPayload(GameDatabase database, SheetUploadConnectionSettings.Values settings)
@@ -74,14 +74,46 @@ internal static class GameDatabaseSheetUpload
                 rows = database.Relics.Where(value => value != null).Select(RelicRow).ToList()
             });
         }
+        if (database.Encounters.Any(value => value != null))
+        {
+            if (string.IsNullOrWhiteSpace(settings.EncountersSheetName))
+                throw new InvalidOperationException("시트 업로드 연결에서 전투 편성 탭 이름을 입력해 주세요.");
+            if (payload.tables.Any(table => string.Equals(table.name, settings.EncountersSheetName, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("전투 편성 탭 이름은 다른 데이터 탭 이름과 달라야 합니다.");
+            payload.tables.Add(new UploadTable
+            {
+                name = settings.EncountersSheetName,
+                rows = database.Encounters.Where(value => value != null)
+                    .Select(value => EncounterRow(value, database)).ToList()
+            });
+        }
         return payload;
     }
 
-    //카드 정보와 상점 가격의 시트 업로드 필드 구성
+    //전투 편성 검증 후 시트 열 구성, 빈 자리는 0 유지
+    private static UploadRow EncounterRow(EncounterData encounter, GameDatabase database)
+    {
+        if (encounter.Id <= 0 || string.IsNullOrWhiteSpace(encounter.DisplayName) ||
+            encounter.EnemyIds == null || encounter.EnemyIds.Count != 3 ||
+            !encounter.EnemyIds.Any(id => id > 0))
+            throw new InvalidOperationException($"전투 편성 '{encounter.Id}'의 이름과 적 배치 3칸을 확인해 주세요.");
+        var row = NewRow(encounter);
+        Add(row, "encounterId", encounter.Id.ToString(CultureInfo.InvariantCulture));
+        Add(row, "encounterName", encounter.DisplayName);
+        for (int slot = 0; slot < 3; slot++)
+        {
+            int enemyId = encounter.EnemyIds[slot];
+            if (enemyId < 0 || (enemyId != 0 && !database.TryGetEnemy(enemyId, out _)))
+                throw new InvalidOperationException($"전투 편성 '{encounter.Id}'의 적 ID '{enemyId}'가 유효하지 않습니다.");
+            Add(row, $"enemyId{slot + 1}", enemyId.ToString(CultureInfo.InvariantCulture));
+        }
+        Add(row, "enabled", "TRUE");
+        return row;
+    }
+
+    //카드 정보와 효과의 시트 업로드 필드 구성
     private static UploadRow CardRow(CardData card)
     {
-        if (card.ShopPrice < 0)
-            throw new InvalidOperationException($"카드 {card.Id}의 shopPrice 값은 음수일 수 없습니다.");
         var row = NewRow(card);
         Add(row, "cardId", card.Id.ToString(CultureInfo.InvariantCulture));
         Add(row, "cardName", card.DisplayName);
@@ -89,12 +121,21 @@ internal static class GameDatabaseSheetUpload
         Add(row, "cardType", card.CardType.ToString());
         Add(row, "rarity", card.Rarity.ToString());
         Add(row, "cost", card.Cost.ToString(CultureInfo.InvariantCulture));
-        Add(row, "shopPrice", card.ShopPrice.ToString(CultureInfo.InvariantCulture));
-        Add(row, "target", card.Effects.Count > 0 ? card.Effects[0].Target.ToString() : string.Empty);
-        Add(row, "effect1", card.Effects.Count > 0 ? LegacyEffect(card.Effects[0].Type) : "None");
-        Add(row, "value1", card.Effects.Count > 0 ? card.Effects[0].Amount.ToString(CultureInfo.InvariantCulture) : "0");
-        Add(row, "effect2", card.Effects.Count > 1 ? LegacyEffect(card.Effects[1].Type) : "None");
-        Add(row, "value2", card.Effects.Count > 1 ? card.Effects[1].Amount.ToString(CultureInfo.InvariantCulture) : "0");
+        //소멸 표식은 별도 열로 분리, 효과 두 칸에는 실제 효과만 기록
+        var effects = card.Effects.Where(effect => effect.Type != EffectType.Exhaust).ToList();
+        var upgraded = (card.UpgradedEffects.Count > 0 ? card.UpgradedEffects : card.Effects)
+            .Where(effect => effect.Type != EffectType.Exhaust).ToList();
+        if (effects.Count > 2 || upgraded.Count > 2)
+            throw new InvalidOperationException($"카드 {card.Id}: 시트에 기록 가능한 효과는 2개입니다.");
+        for (int slot = 0; slot < 2; slot++)
+        {
+            AddRelicEffect(row, slot + 1, slot < effects.Count ? effects[slot] : default, slot < effects.Count);
+            Add(row, $"upgradeValue{slot + 1}", slot < upgraded.Count
+                ? upgraded[slot].Amount.ToString(CultureInfo.InvariantCulture) : "0");
+        }
+        Add(row, "upgradeCost", card.UpgradeCost.ToString(CultureInfo.InvariantCulture));
+        Add(row, "exhaust", card.Exhaust || card.Effects.Any(effect => effect.Type == EffectType.Exhaust) ? "TRUE" : "FALSE");
+        Add(row, "enabled", "TRUE");
 
         Add(row, "Character", card.Owner.ToString());
         Add(row, "Type", card.CardType.ToString());
@@ -196,7 +237,7 @@ internal static class GameDatabaseSheetUpload
 
     private static void AddRelicEffect(UploadRow row, int slot, EffectSpec effect, bool hasEffect)
     {
-        Add(row, $"effect{slot}", hasEffect ? ProjectRelicEffect(effect.Type) : "None");
+        Add(row, $"effect{slot}", hasEffect ? effect.Type.ToString() : "None");
         Add(row, $"target{slot}", hasEffect ? effect.Target.ToString() : "None");
         Add(row, $"value{slot}", hasEffect
             ? effect.Amount.ToString(CultureInfo.InvariantCulture)
@@ -207,17 +248,6 @@ internal static class GameDatabaseSheetUpload
     {
         RelicTrigger.OnCardPlayed => "OnCardPlayed",
         _ => trigger.ToString()
-    };
-
-    private static string ProjectRelicEffect(EffectType type) => type switch
-    {
-        EffectType.Strength => "GainStrength",
-        EffectType.Rage => "GainRage",
-        EffectType.Overheat => "GainOverheat",
-        EffectType.MindFracture => "ApplyMentalSplit",
-        EffectType.AmplifyMindFracture => "MultiplyMentalSplit",
-        EffectType.NextMindFractureBonus => "ApplyHallucination",
-        _ => type.ToString()
     };
 
     private static UploadRow NewRow(GameDataEntry entry)
@@ -241,16 +271,6 @@ internal static class GameDatabaseSheetUpload
         CharacterClass.FireMage => "Flame",
         CharacterClass.Warlock => "Abyss",
         _ => "Public"
-    };
-
-    private static string LegacyEffect(EffectType type) => type switch
-    {
-        EffectType.Strength => "GainStrength",
-        EffectType.Rage => "GainRage",
-        EffectType.Burn => "ApplyBurn",
-        EffectType.MindFracture => "ApplyMentalSplit",
-        EffectType.AmplifyMindFracture => "MultiplyMentalSplit",
-        _ => type.ToString()
     };
 
     [Serializable]

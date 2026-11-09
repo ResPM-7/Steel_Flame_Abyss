@@ -9,7 +9,7 @@ public class CardRewardModel
     public bool IsClaimed { get; private set; }
 
     //캐릭터 카드와 공용 카드에서 중복 없는 후보 추첨
-    public CardRewardModel(IEnumerable<CardData> cards, CharacterClass owner, Random random)
+    public CardRewardModel(IEnumerable<CardData> cards, CharacterClass owner, Random random, RarityWeights dropRates = null, int choiceCount = 3)
     {
         if (cards == null || random == null)
             throw new ArgumentNullException();
@@ -23,9 +23,10 @@ public class CardRewardModel
             pool.Add(card);
         }
 
-        while (pool.Count > 0 && candidates.Count < 3)
+        while (pool.Count > 0 && candidates.Count < Math.Max(1, choiceCount))
         {
-            int index = random.Next(pool.Count);
+            int index = RarityWeightedPicker.SelectIndex(pool, random, item => item.Rarity, dropRates);
+            if (index < 0) break;
             candidates.Add(pool[index]);
             pool.RemoveAt(index);
         }

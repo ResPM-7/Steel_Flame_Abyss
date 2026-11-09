@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 66289925331153226}
   - component: {fileID: 6194655548314729874}
   - component: {fileID: 6563572095996711554}
+  - component: {fileID: 6036562133401670937}
   m_Layer: 5
   m_Name: Canvas_Popup
   m_TagString: Untagged
@@ -118,4 +119,23 @@ MonoBehaviour:
   shopPrefab: {fileID: 8620331942681480136, guid: f536c2acdcf03424cbd70a81bfb8d2e5, type: 3}
   campPrefab: {fileID: 4652986571930428012, guid: 943835583e2bb5844ab64b9730758c88, type: 3}
   eventPrefab: {fileID: 6754270122478344078, guid: d95868429eb4a7947b692c9f651ea223, type: 3}
+  defaultEvent: {fileID: 11400000, guid: 3bc55169fa2905146bc7ce2b9d3616e3, type: 2}
+  eventDatabase: {fileID: -3273855691364875213, guid: 3bc55169fa2905146bc7ce2b9d3616e3, type: 2}
   deckPrefab: {fileID: 4390597565296369372, guid: 09970e7cb504e9543824dc9ea5063b01, type: 3}
+  commonHudCanvases:
+  - {fileID: 0}
+  - {fileID: 0}
+--- !u!114 &6036562133401670937
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8901989180541690705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b1da25f1d18a4a4d96e5da63070a8b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SettingsPopupSpawner
+  prefab: {fileID: 2488678328878684656, guid: 37078b482d7b15f448a4023a92e09944, type: 3}
+  popupRoot: {fileID: 6556848082030925693}

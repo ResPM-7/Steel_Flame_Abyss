@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 //맵 팝업의 최초 생성과 데이터 주입 및 씬 내 재사용
@@ -11,9 +12,9 @@ public class MapPopupManager : MonoBehaviour
     [SerializeField] private MapEventDefinition defaultEvent;
     [SerializeField] private EventDatabase eventDatabase;
     [SerializeField] private CardListPanelView deckPrefab;
-    [SerializeField] private Canvas commonHudCanvas;
+    [SerializeField] private Canvas[] commonHudCanvases = Array.Empty<Canvas>();
     private bool hudHiddenForDeck;
-    private bool previousHudEnabled;
+    private readonly Dictionary<GameObject, bool> previousHudStates = new Dictionary<GameObject, bool>();
     private ShopPanelView shop;
     private CampPanelView camp;
     private EventPanelView eventView;
@@ -21,6 +22,7 @@ public class MapPopupManager : MonoBehaviour
     private ShopPresenter shopPresenter;
     private CoinModel coins;
     private OwnedDeckModel cards;
+    private OwnedRelicModel relics;
     private RunProgressModel run;
     private IGameDataProvider provider;
     private ObjectPoolManager pool;
@@ -29,12 +31,13 @@ public class MapPopupManager : MonoBehaviour
 
     //팝업 세션 의존성 보관과 카드 풀 사전 준비
     public void Inject(RunProgressModel progress, CoinModel coinModel, OwnedDeckModel ownedDeck,
-        IGameDataProvider data, ObjectPoolManager objectPool)
+        IGameDataProvider data, ObjectPoolManager objectPool, OwnedRelicModel ownedRelics)
     {
         if (run != null) throw new InvalidOperationException("팝업 관리자는 씬에서 한 번만 주입해 주세요");
         run = progress ?? throw new ArgumentNullException(nameof(progress));
         coins = coinModel ?? throw new ArgumentNullException(nameof(coinModel));
         cards = ownedDeck ?? throw new ArgumentNullException(nameof(ownedDeck));
+        relics = ownedRelics ?? throw new ArgumentNullException(nameof(ownedRelics));
         provider = data ?? throw new ArgumentNullException(nameof(data));
         pool = objectPool != null ? objectPool : throw new ArgumentNullException(nameof(objectPool));
         if (deckPrefab != null) _ = deckPrefab.PreparePoolAsync(pool);
@@ -58,7 +61,7 @@ public class MapPopupManager : MonoBehaviour
     {
         CloseAll();
         GetOrCreate(ref shop, shopPrefab);
-        if (shopPresenter == null) shopPresenter = new ShopPresenter(coins, cards, shop);
+        if (shopPresenter == null) shopPresenter = new ShopPresenter(coins, cards, shop, relics, provider, run);
         shopPresenter.Open(nodeIndex, provider.Database.Cards,
             provider.GetCharacter(run.PlayerId).Class, completed);
     }
@@ -106,21 +109,30 @@ public class MapPopupManager : MonoBehaviour
         if (deck != null) deck.Close();
     }
 
-    //덱 표시 중 공통 HUD 숨김과 닫기 시 기존 상태 복원
+    //덱 표시 중 모든 공통 HUD 숨김과 개별 활성 상태 복원
     private void OnDeckVisibilityChanged(bool visible)
     {
-        if (commonHudCanvas == null) return;
         if (visible)
         {
             if (hudHiddenForDeck) return;
-            previousHudEnabled = commonHudCanvas.enabled;
             hudHiddenForDeck = true;
-            commonHudCanvas.enabled = false;
+            previousHudStates.Clear();
+            if (commonHudCanvases == null) return;
+            foreach (Canvas canvas in commonHudCanvases)
+            {
+                if (canvas == null || previousHudStates.ContainsKey(canvas.gameObject)) continue;
+                GameObject hud = canvas.gameObject;
+                previousHudStates.Add(hud, hud.activeSelf);
+                //중첩 Canvas의 부모 렌더링과 숨은 HUD 입력까지 차단
+                hud.SetActive(false);
+            }
         }
         else if (hudHiddenForDeck)
         {
-            commonHudCanvas.enabled = previousHudEnabled;
             hudHiddenForDeck = false;
+            foreach (var state in previousHudStates)
+                if (state.Key != null) state.Key.SetActive(state.Value);
+            previousHudStates.Clear();
         }
     }
 

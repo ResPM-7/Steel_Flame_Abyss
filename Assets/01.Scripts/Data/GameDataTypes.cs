@@ -21,7 +21,8 @@ public enum RelicTrigger
     BattleReward = 6,
     TurnEnd = 7,
     BattleEnd = 8,
-    OnDamageTaken = 9
+    OnDamageTaken = 9,
+    FirstCardHealthLost = 10 //턴마다 첫 카드 체력 소모
 }
 
 public enum EffectType
@@ -38,6 +39,7 @@ public enum EffectType
     Burn = 21,           //화상
     Ignite = 22,         //화상즉시 대미지
     Overheat = 23,       //과열부여
+    BurnRetaliation = 24, //공격받을 때 화상 반격
 
     //흑마법사 능력
     MindFracture = 31,          //정신분열부여
@@ -50,6 +52,11 @@ public enum EffectType
     Weak = 104,               //약화(공격감소)
     Vulnerable = 105,         //취약(들어가는 데미지 증가)
     AttackDamageBonus = 106,  //공격카드 피해 증가
+    NextCardHealthCost = 109, //다음 카드 비용을 체력으로 지불
+    NextCardDiscount = 108,  //이번 턴 다음 카드 한 장 비용 할인
+    LoseHealth = 107,         //방어도와 공격 보정 무시 체력 소모
+
+    CardRewardChoiceBonus = 110, //전투 보상 카드 후보 추가
 
     GoldMultiplier = 199      //골드배율
 }

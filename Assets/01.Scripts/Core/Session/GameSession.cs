@@ -5,25 +5,39 @@ using UnityEngine.SceneManagement;
 [AddComponentMenu("")]
 public class GameSession : MonoBehaviour, IRunSceneLoader
 {
+    private static GameSession activeSession;
     private readonly CoinModel coins = new CoinModel();
     private readonly OwnedDeckModel ownedDeck = new OwnedDeckModel();
     private readonly RunProgressModel run = new RunProgressModel();
+    private readonly OwnedRelicModel ownedRelics = new OwnedRelicModel();
+    public OwnedRelicModel OwnedRelics => ownedRelics;
     private SceneMenuActions sceneLoader;
+    private SoundManager soundManager;
     public bool IsLoading => sceneLoader != null && sceneLoader.IsLoading;
 
-    //첫 씬 로드 전 중복 없는 게임 세션 생성
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    private static void CreateSession()
+    //도메인 재로드 비활성 환경의 이전 세션 참조 초기화
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetSessionReference()
     {
-        if (FindFirstObjectByType<GameSession>() != null) return;
-        new GameObject("GameSession").AddComponent<GameSession>();
+        activeSession = null;
     }
 
     //게임 세션 유지와 공통 씬 로더 및 로드 이벤트 연결
     private void Awake()
     {
+        if (activeSession != null && activeSession != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        activeSession = this;
         DontDestroyOnLoad(gameObject);
-        sceneLoader = gameObject.AddComponent<SceneMenuActions>();
+        //인스펙터에 연결한 관리자 사용과 비동기 사운드 준비
+        soundManager = GetComponent<SoundManager>();
+        if (soundManager != null) _ = soundManager.InitializeAsync();
+        else GameLogger.LogError("[사운드] GameSession 오브젝트에 SoundManager를 추가해 주세요", this);
+        sceneLoader = GetComponent<SceneMenuActions>();
+        if (sceneLoader == null) sceneLoader = gameObject.AddComponent<SceneMenuActions>();
         sceneLoader.InjectNewGameAction(ResetRun);
         SceneManager.sceneLoaded += InjectScene;
     }
@@ -41,28 +55,73 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
         }
         foreach (GameObject root in scene.GetRootGameObjects())
         {
+            foreach (SettingsPopupSpawner settings in root.GetComponentsInChildren<SettingsPopupSpawner>(true))
+            {
+                settings.InjectMenuActions(sceneLoader);
+                settings.InjectSound(soundManager);
+            }
+            foreach (SoundPlayer sound in root.GetComponentsInChildren<SoundPlayer>(true))
+                sound.Inject(soundManager);
+            foreach (SettingsPanelView settingsView in root.GetComponentsInChildren<SettingsPanelView>(true))
+                settingsView.InjectSound(soundManager);
+            foreach (TitleCharacterSelectView selection in root.GetComponentsInChildren<TitleCharacterSelectView>(true))
+            {
+                selection.InjectMenuActions(sceneLoader);
+                selection.Inject(this);
+            }
             foreach (CoinInstaller installer in root.GetComponentsInChildren<CoinInstaller>(true))
                 installer.Inject(coins);
             foreach (BattleInstaller installer in root.GetComponentsInChildren<BattleInstaller>(true))
+            {
+                installer.InjectSound(soundManager);
                 installer.InjectOwnedDeck(ownedDeck);
+                installer.InjectOwnedRelics(ownedRelics);
+            }
             foreach (GameFlowController flow in root.GetComponentsInChildren<GameFlowController>(true))
-                flow.InjectRun(run, coins, ownedDeck, this);
+                flow.InjectRun(run, coins, ownedDeck, this, ownedRelics);
             foreach (BattleSceneController battle in root.GetComponentsInChildren<BattleSceneController>(true))
                 battle.Inject(run, this);
+            foreach (RelicPanelView relicPanel in root.GetComponentsInChildren<RelicPanelView>(true))
+                relicPanel.Inject(ownedRelics);
+            foreach (BattlePopupManager popup in root.GetComponentsInChildren<BattlePopupManager>(true))
+            {
+                popup.InjectMenuActions(sceneLoader);
+            }
         }
 #if UNITY_EDITOR
         InjectEditorCheats(scene);
 #endif
     }
 
+    //캐릭터와 시작 덱 검증 후 새 런 준비 및 맵 이동
+    public bool TryStartNewGame(CharacterData character, GameDatabase database)
+    {
+        if (IsLoading || sceneLoader == null || character == null || database == null ||
+            !database.TryGetCharacter(character.Id, out var registered) || registered != character ||
+            character.MaxHealth <= 0 || character.StartingDeckIds.Count == 0) return false;
+        var deck = new System.Collections.Generic.List<int>(character.StartingDeckIds);
+        foreach (int id in deck)
+        {
+            if (database.TryGetCard(id, out _)) continue;
+            GameLogger.LogError($"[캐릭터 선택] {character.DisplayName} 시작 덱의 카드 {id} 확인", this);
+            return false;
+        }
+        return sceneLoader.TryLoadScene(sceneLoader.MapScenePath, () =>
+        {
+            ResetRun();
+            run.PreparePlayer(character);
+            ownedDeck.InitializeOnce(deck);
+        });
+    }
+
     //전투 대상과 보스 여부 저장 및 비동기 씬 이동
-    public bool EnterBattle(int enemyId, bool isFinalBoss = false)
+    public bool EnterBattle(int encounterId, bool isFinalBoss = false)
     {
         if (IsLoading || run.IsCleared || run.Health == null || !run.Health.IsAlive || run.HasPendingBattle ||
             run.Map == null || !run.Map.IsVisiting || !sceneLoader.CanLoad(sceneLoader.BattleScenePath) ||
             !sceneLoader.CanLoad(sceneLoader.MapScenePath))
             return false;
-        run.SetBattle(enemyId, isFinalBoss);
+        run.SetBattle(encounterId, isFinalBoss);
         if (sceneLoader.TryLoadScene(sceneLoader.BattleScenePath)) return true;
         run.ClearBattle();
         return false;
@@ -97,6 +156,10 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
         if (installer != null) installer.InjectEditorCheats(panel, coins, ownedDeck);
         else if (flow != null) panel.Inject(flow.Data, null, null, coins, ownedDeck);
         panel.InjectRunHealth(() => run.Health);
+        GameDataProvider relicData = null;
+        foreach (GameObject root in scene.GetRootGameObjects())
+            if (relicData == null) relicData = root.GetComponentInChildren<GameDataProvider>(true);
+        panel.InjectRelicGrant(id => ownedRelics.TryAdd(id, relicData));
     }
 #endif
 
@@ -105,6 +168,7 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
     {
         coins.Reset();
         ownedDeck.Reset();
+        ownedRelics.Reset();
         run.Reset();
     }
 
@@ -112,5 +176,6 @@ public class GameSession : MonoBehaviour, IRunSceneLoader
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= InjectScene;
+        if (activeSession == this) activeSession = null;
     }
 }

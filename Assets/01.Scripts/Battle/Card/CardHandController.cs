@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 //카드 덱의 드로우와 버리기 결과를 미리 배치한 손패 슬롯에 표시
@@ -10,6 +10,9 @@ public class CardHandController : MonoBehaviour
     [SerializeField] private CardHandLayout handLayout;
     [SerializeField] private RectTransform hoverLayer;
     [SerializeField] private CardView[] slots;
+    [Header("단일 적 타겟팅")]
+    [SerializeField] private RectTransform cardCenter;
+    [SerializeField] private CardTargetArrowView targetArrow;
 
 #if UNITY_EDITOR
     //손패 빈자리 확인과 치트 카드 추가
@@ -23,6 +26,17 @@ public class CardHandController : MonoBehaviour
 #endif
 
     public bool IsReady => deckManager != null && deckManager.IsReady;
+    //첫 손패 전체의 실제 표시 연결 확인
+    public bool IsDisplayReady
+    {
+        get
+        {
+            if (!IsReady || slots == null || handLayout == null || hoverLayer == null || HandCount > slots.Length) return false;
+            for (int i = 0; i < HandCount; i++)
+                if (slots[i] == null || !slots[i].IsConfigured || slots[i].Card != deckManager.Hand[i] || !slots[i].gameObject.activeInHierarchy) return false;
+            return true;
+        }
+    }
     public int HandCount => deckManager?.HandCount ?? 0;
     public int DrawCount => deckManager?.DrawCount ?? 0;
     public int DiscardCount => deckManager?.DiscardCount ?? 0;
@@ -56,16 +70,6 @@ public class CardHandController : MonoBehaviour
             deckManager.Changed -= RefreshHand;
         if (cardPlayController != null)
             cardPlayController.DescriptionsChanged -= RefreshDescriptions;
-    }
-
-    //전투 덱 관리자에 테스트 덱 초기화 요청
-    public void ResetTestDeck()
-    {
-        if (!Application.isPlaying || !ValidateReferences())
-            return;
-
-        if (deckManager.ResetTestDeck())
-            LogState("테스트 덱 초기화");
     }
 
     //손패 빈자리만큼 카드를 뽑고 표시를 갱신
@@ -127,14 +131,17 @@ public class CardHandController : MonoBehaviour
             for (int index = 0; index < visibleCount; index++)
             {
                 if (slots[index] != null)
+                {
+                    slots[index].SetTargetingReferences(cardCenter, targetArrow);
                     slots[index].Bind(deckManager.Hand[index], hoverLayer, cardPlayController);
+                }
             }
         }
 
         handLayout.RefreshSpacing();
     }
 
-    //힘 변경에 따른 손패 설명 갱신
+    //힘과 약화 및 대상 상태 변경에 따른 손패 설명 갱신
     private void RefreshDescriptions()
     {
         if (slots == null)

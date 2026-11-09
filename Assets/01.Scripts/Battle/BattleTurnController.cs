@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 //플레이어 턴 시작과 종료에 필요한 전투 상태 변경
 public class BattleTurnController : MonoBehaviour
@@ -9,6 +9,10 @@ public class BattleTurnController : MonoBehaviour
     private BattleParticipants participants;
     private bool isResolvingTurn;
     private bool initializeOnStart = true;
+    private BattleRelicEffects relicEffects;
+
+    //플레이어 턴 시작에 실행할 유물 효과 주입
+    public void InjectRelics(BattleRelicEffects effects) => relicEffects = effects;
 
     //맵 선택 전 자동 덱 시작 해제
     public void UseMapFlow()
@@ -40,22 +44,50 @@ public class BattleTurnController : MonoBehaviour
     //손패 정리와 적 행동 실행 후 다음 플레이어 턴 시작
     public void EndPlayerTurn()
     {
+        if (SceneTransitionController.BlocksGameplay) return;
         if (isResolvingTurn || !ValidateReferences() || !deckManager.IsReady || !participants.IsReady)
             return;
         if (!participants.IsBattleActive)
             return;
 
         isResolvingTurn = true;
+        //1. 플레이어 손패 버림
+        //2. 플레이어에게 걸린 화상 피해 적용
+        //3. 몬스터에게 걸린 화상 피해 적용
+        //4. 몬스터 정신분열 처형 검사
+        //5. 몬스터 공격·행동 실행
+        //6. 다음 플레이어 턴 시작
+
         try
         {
+            relicEffects?.EndPlayerTurn();
             deckManager.DiscardAll();
-            participants.Enemy.Stats.ClearBlock();
-            participants.Enemy.ExecutePlannedAction(participants.Player.Stats);
+            //플레이어 화상으로 패배하면 적 행동 중단
+            participants.Player.Stats.ResolveBurnAtTurnEnd();
+            if (!participants.IsBattleActive) return;
 
-            if (!participants.IsBattleActive)
+            //모든 적 화상 처리 후 정신분열 검사
+            foreach (var enemy in participants.Enemies)
             {
-                GameLogger.Log("[턴] 전투 종료 / 다음 턴 진행 중단", this);
-                return;
+                if (enemy.Stats.IsAlive) enemy.Stats.ResolveBurnAtTurnEnd();
+                if (!participants.IsBattleActive) return;
+            }
+            foreach (var enemy in participants.Enemies)
+            {
+                if (enemy.Stats.IsAlive) enemy.Stats.TryExecuteMindFracture();
+                if (!participants.IsBattleActive) return;
+            }
+            participants.Player.Stats.TickDebuffs();
+
+            //생존한 적을 배치 순서대로 실행, 승패 확정 시 즉시 중단
+            foreach (var enemy in participants.Enemies)
+            {
+                if (!enemy.Stats.IsAlive) continue;
+                enemy.Stats.ClearBlock();
+                enemy.Stats.ClearBurnRetaliation();
+                enemy.ExecutePlannedAction(participants.Player.Stats);
+                if (!participants.IsBattleActive) return;
+                enemy.Stats.TickDebuffs();
             }
 
             StartPlayerTurn();
@@ -70,9 +102,12 @@ public class BattleTurnController : MonoBehaviour
     private void StartPlayerTurn()
     {
         participants.Player.Stats.ClearBlock();
+        participants.Player.Stats.ClearBurnRetaliation();
         participants.Player.ResetEnergy();
-        participants.Enemy.PlanNextAction();
+        foreach (var enemy in participants.Enemies)
+            enemy.PlanNextAction();
         int drawnCount = deckManager.DrawCards(cardsPerTurn);
+        relicEffects?.Apply(RelicTrigger.TurnStart);
         GameLogger.Log($"[턴] 적 행동 완료 / 내 턴 시작 / 새 손패 {drawnCount}장", this);
     }
 

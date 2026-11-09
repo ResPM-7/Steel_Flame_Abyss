@@ -9,11 +9,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
-/// <summary>
-/// 공개 CSV 주소에서 모든 시트를 내려받아 검증한 뒤 GameDatabase 서브에셋을 갱신합니다.
-/// 일부 시트만 적용되는 상태를 막기 위해 네 시트 다운로드와 검증이 모두 끝난 후에만 에셋을 변경합니다.
-/// </summary>
-internal static class GameDatabaseCsvSync
+//연결된 CSV 다운로드와 전체 검증 후 GameDatabase 서브에셋 갱신
+internal static partial class GameDatabaseCsvSync
 {
     internal const string DatabasePath = "Assets/03.Data/GameDatabase.asset";
     private static bool isSyncing;
@@ -35,10 +32,12 @@ internal static class GameDatabaseCsvSync
             ? null
             : DownloadCsvBlocking("유물", urls.Relics);
 
-        var input = ReadAndValidateAllSheets(cardsCsv, charactersCsv, enemiesCsv, relicsCsv);
+        var encountersCsv = string.IsNullOrWhiteSpace(urls.Encounters)
+            ? null : DownloadCsvBlocking("전투 편성", urls.Encounters);
+        var input = ReadAndValidateAllSheets(cardsCsv, charactersCsv, enemiesCsv, relicsCsv, encountersCsv);
         Apply(database, input);
         Debug.Log($"[게임 데이터] 배치 복구 완료: 카드 {input.Cards.Count}, " +
-                  $"캐릭터 {input.Characters.Count}, 적 {input.Enemies.Count}, 유물 {input.Relics.Count}");
+                  $"캐릭터 {input.Characters.Count}, 적 {input.Enemies.Count}, 유물 {input.Relics.Count}, 전투 편성 {input.Encounters?.Count ?? 0}");
     }
 
     [MenuItem("Tools/데이터/게임 데이터베이스 선택", false, 200)]
@@ -84,21 +83,26 @@ internal static class GameDatabaseCsvSync
             if (hasRelicSheet)
                 downloadTasks.Add(DownloadCsvAsync("유물", urls.Relics));
 
+            var hasEncounterSheet = !string.IsNullOrWhiteSpace(urls.Encounters);
+            if (hasEncounterSheet)
+                downloadTasks.Add(DownloadCsvAsync("전투 편성", urls.Encounters));
+
             var downloads = await Task.WhenAll(downloadTasks);
 
             EditorUtility.DisplayProgressBar("원격 시트 동기화", "CSV 형식과 데이터 참조를 검증하는 중...", 0.65f);
             var input = ReadAndValidateAllSheets(downloads[0], downloads[1], downloads[2],
-                hasRelicSheet ? downloads[3] : null);
+                hasRelicSheet ? downloads[3] : null,
+                hasEncounterSheet ? downloads[hasRelicSheet ? 4 : 3] : null);
 
             EditorUtility.DisplayProgressBar("원격 시트 동기화", "서브에셋을 갱신하는 중...", 0.9f);
             Apply(database, input);
             Debug.Log($"[게임 데이터] 원격 시트 동기화 완료: 카드 {input.Cards.Count}, " +
-                      $"캐릭터 {input.Characters.Count}, 적 {input.Enemies.Count}, 유물 {input.Relics.Count}");
+                      $"캐릭터 {input.Characters.Count}, 적 {input.Enemies.Count}, 유물 {input.Relics.Count}, 전투 편성 {input.Encounters?.Count ?? 0}");
 
             if (showDialogOnFailure)
                 EditorUtility.DisplayDialog("원격 시트 동기화 완료",
                     $"카드 {input.Cards.Count}개 / 캐릭터 {input.Characters.Count}개 / " +
-                    $"적 {input.Enemies.Count}개 / 유물 {input.Relics.Count}개를 반영했습니다.", "확인");
+                    $"적 {input.Enemies.Count}개 / 유물 {input.Relics.Count}개 / 전투 편성 {input.Encounters?.Count ?? 0}개를 반영했습니다.", "확인");
         }
         catch (Exception exception)
         {
@@ -115,7 +119,7 @@ internal static class GameDatabaseCsvSync
     }
 
     private static ImportData ReadAndValidateAllSheets(string cardsCsv, string charactersCsv,
-        string enemiesCsv, string relicsCsv)
+        string enemiesCsv, string relicsCsv, string encountersCsv = null)
     {
         var input = new ImportData
         {
@@ -125,18 +129,23 @@ internal static class GameDatabaseCsvSync
             // 유물은 MVP 후순위이므로 URL이 없으면 빈 목록으로 정상 처리합니다.
             Relics = string.IsNullOrWhiteSpace(relicsCsv)
                 ? new List<RelicRow>()
-                : ReadRelics(CsvTable.Parse("유물 시트", relicsCsv))
+                : ReadRelics(CsvTable.Parse("유물 시트", relicsCsv)),
+            Encounters = encountersCsv == null ? null : ReadEncounters(CsvTable.Parse("전투 편성 시트", encountersCsv))
         };
 
         var allIds = new HashSet<int>();
         foreach (var id in input.Cards.Select(x => x.Id)
                      .Concat(input.Characters.Select(x => x.Id))
                      .Concat(input.Enemies.Select(x => x.Id))
-                     .Concat(input.Relics.Select(x => x.Id)))
+                     .Concat(input.Relics.Select(x => x.Id))
+                     .Concat(input.Encounters?.Select(x => x.Id) ?? Enumerable.Empty<int>()))
         {
             if (!allIds.Add(id))
                 throw new InvalidDataException($"모든 시트를 통틀어 ID '{id}'가 중복됩니다.");
         }
+
+        if (input.Encounters != null)
+            ValidateEncounterEnemies(input.Encounters, input.Enemies.Select(x => x.Id).ToHashSet());
 
         var cardIds = input.Cards.Select(x => x.Id).ToHashSet();
         foreach (var character in input.Characters)
@@ -210,15 +219,16 @@ internal static class GameDatabaseCsvSync
         return text;
     }
 
-    //카드 시트의 기본 정보와 상점 가격 검증
+    //카드 시트의 기본 정보와 효과 검증
     private static List<CardRow> ReadCards(CsvTable table)
     {
-        // 기존 Total Card 탭은 기획자가 쓰던 열 이름을 유지하고 Unity 형식으로 변환합니다.
-        if (table.Has("cardId", "cardName", "owner", "cardType", "rarity", "cost", "target",
-                "effect1", "value1", "effect2", "value2"))
+        //기획 시트의 효과별 타깃과 이전 공통 타깃 지원
+        if (table.Has("cardId", "cardName", "owner", "cardType", "rarity", "cost",
+                "effect1", "value1", "effect2", "value2") &&
+            (table.Has("target1", "target2") || table.Has("target")))
             return ReadTotalCardRows(table);
 
-        table.Require("Id", "Name", "Character", "Type", "Rarity", "Cost", "ShopPrice", "Description", "UpgradedDescription", "Effects", "UpgradedEffects", "Keywords");
+        table.Require("Id", "Name", "Character", "Type", "Rarity", "Cost", "Description", "UpgradedDescription", "Effects", "UpgradedEffects", "Keywords");
         var result = new List<CardRow>();
         for (var row = 0; row < table.RowCount; row++)
         {
@@ -231,7 +241,6 @@ internal static class GameDatabaseCsvSync
                 Type = EnumValue<CardType>(table, row, "Type"),
                 Rarity = EnumValue<DataRarity>(table, row, "Rarity"),
                 Cost = NonNegativeInt(table, row, "Cost"),
-                ShopPrice = NonNegativeInt(table, row, "ShopPrice"),
                 Description = table.Get(row, "Description"),
                 UpgradedDescription = table.Get(row, "UpgradedDescription"),
                 Effects = Effects(table, row, "Effects"),
@@ -243,10 +252,9 @@ internal static class GameDatabaseCsvSync
         return result;
     }
 
-    //기획 카드 시트의 기본 정보와 상점 가격 변환
+    //기획 카드 시트의 기본 정보와 효과 변환
     private static List<CardRow> ReadTotalCardRows(CsvTable table)
     {
-        table.Require("shopPrice");
         var result = new List<CardRow>();
         for (var row = 0; row < table.RowCount; row++)
         {
@@ -254,13 +262,18 @@ internal static class GameDatabaseCsvSync
             if (!ShouldImportRow(table, row, "cardId"))
                 continue;
 
-            var targetText = Required(table, row, "target");
-            var target = string.Equals(targetText, "None", StringComparison.OrdinalIgnoreCase)
-                ? TargetType.Self
-                : EnumFromText<TargetType>(targetText, table, row, "target");
             var effects = new List<EffectSpec>();
-            AddTotalCardEffect(effects, table, row, "effect1", "value1", target);
-            AddTotalCardEffect(effects, table, row, "effect2", "value2", target);
+            var upgradedEffects = new List<EffectSpec>();
+            for (int slot = 1; slot <= 2; slot++)
+            {
+                string effectColumn = $"effect{slot}";
+                if (string.Equals(table.Get(row, effectColumn), "None", StringComparison.OrdinalIgnoreCase)) continue;
+                string targetColumn = table.Has($"target{slot}") ? $"target{slot}" : "target";
+                var target = EnumFromText<TargetType>(Required(table, row, targetColumn), table, row, targetColumn);
+                AddTotalCardEffect(effects, table, row, effectColumn, $"value{slot}", target);
+                if (table.Has("upgradeValue1", "upgradeValue2"))
+                    AddTotalCardEffect(upgradedEffects, table, row, effectColumn, $"upgradeValue{slot}", target);
+            }
 
             result.Add(new CardRow
             {
@@ -270,16 +283,28 @@ internal static class GameDatabaseCsvSync
                 Type = EnumValue<CardType>(table, row, "cardType"),
                 Rarity = EnumValue<DataRarity>(table, row, "rarity"),
                 Cost = NonNegativeInt(table, row, "cost"),
-                ShopPrice = NonNegativeInt(table, row, "shopPrice"),
+                UpgradeCost = table.Has("upgradeCost") ? NonNegativeInt(table, row, "upgradeCost") : -1,
+                Exhaust = ReadExhaust(table, row),
                 Description = table.Has("description") ? table.Get(row, "description") : string.Empty,
                 UpgradedDescription = string.Empty,
                 Effects = effects,
-                UpgradedEffects = new List<EffectSpec>(),
+                UpgradedEffects = upgradedEffects,
                 Keywords = new List<string>()
             });
         }
         EnsureUnique(result.Select(x => x.Id), "Total Card 시트");
         return result;
+    }
+
+    //소멸 체크박스 검증, 잘못된 값의 조용한 누락 방지
+    private static bool ReadExhaust(CsvTable table, int row)
+    {
+        if (!table.Has("exhaust")) return false;
+        string raw = table.Get(row, "exhaust").Trim();
+        if (bool.TryParse(raw, out bool value)) return value;
+        if (raw == "1") return true;
+        if (raw == "0" || raw.Length == 0) return false;
+        throw Error(table, row, "exhaust는 TRUE 또는 FALSE로 입력해 주세요.");
     }
 
     private static void AddTotalCardEffect(List<EffectSpec> effects, CsvTable table, int row,
@@ -295,25 +320,12 @@ internal static class GameDatabaseCsvSync
         effects.Add(new EffectSpec(effectType, target, NonNegativeInt(table, row, valueColumn)));
     }
 
+    //시트 효과 이름과 enum 이름 직접 연결 및 숫자·별칭 입력 차단
     private static bool TryMapProjectEffect(string raw, out EffectType type)
     {
-        var aliases = new Dictionary<string, EffectType>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Damage"] = EffectType.Damage,
-            ["Block"] = EffectType.Block,
-            ["Draw"] = EffectType.Draw,
-            ["GainEnergy"] = EffectType.GainEnergy,
-            ["Exhaust"] = EffectType.Exhaust,
-            ["GainStrength"] = EffectType.Strength,
-            ["GainRage"] = EffectType.Rage,
-            ["ApplyBurn"] = EffectType.Burn,
-            ["Ignite"] = EffectType.Ignite,
-            ["GainOverheat"] = EffectType.Overheat,
-            ["ApplyMentalSplit"] = EffectType.MindFracture,
-            ["MultiplyMentalSplit"] = EffectType.AmplifyMindFracture,
-            ["ApplyHallucination"] = EffectType.NextMindFractureBonus
-        };
-        return Enum.TryParse(raw.Trim(), true, out type) || aliases.TryGetValue(raw.Trim(), out type);
+        string name = raw?.Trim();
+        return Enum.TryParse(name, true, out type) && Enum.IsDefined(typeof(EffectType), type) &&
+            string.Equals(name, type.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static CharacterClass ParseProjectOwner(string raw, CsvTable table, int row)
@@ -523,13 +535,27 @@ internal static class GameDatabaseCsvSync
             .Where(entry => entry.Id > 0)
             .GroupBy(entry => entry.Id)
             .ToDictionary(group => group.Key, group => group.First());
+        //편성 시트 미연결 시 기존 편성 보존과 참조 검증
+        if (input.Encounters == null)
+        {
+            input.Encounters = database.Encounters.Where(x => x != null)
+                .Select(x => new EncounterRow { Id = x.Id, Name = x.DisplayName, EnemyIds = x.EnemyIds.ToArray() }).ToList();
+            ValidateEncounterEnemies(input.Encounters, input.Enemies.Select(x => x.Id).ToHashSet());
+        }
+        //서브에셋 변경 전 전체 ID 충돌과 기존 데이터 종류 확인
+        EnsureUnique(input.Cards.Select(x => x.Id).Concat(input.Characters.Select(x => x.Id))
+            .Concat(input.Enemies.Select(x => x.Id)).Concat(input.Relics.Select(x => x.Id))
+            .Concat(input.Encounters.Select(x => x.Id)), "전체 시트");
+        foreach (var row in input.Encounters)
+            if (allExisting.Any(x => x.Id == row.Id && !(x is EncounterData)))
+                throw new InvalidDataException($"전투 편성 ID '{row.Id}'가 다른 데이터 ID와 중복됩니다.");
         var retained = new HashSet<GameDataEntry>();
         var cards = input.Cards.Select(row =>
         {
             var asset = GetOrCreate<CardData>(database, existing, row.Id);
             asset.EditorSetIdentity(row.Id, row.Name);
             asset.EditorApply(row.Owner, row.Type, row.Rarity, row.Cost, row.Description,
-                row.UpgradedDescription, row.Effects, row.UpgradedEffects, row.Keywords, row.ShopPrice);
+                row.UpgradedDescription, row.Effects, row.UpgradedEffects, row.Keywords, row.UpgradeCost, row.Exhaust);
             retained.Add(asset);
             EditorUtility.SetDirty(asset);
             return asset;
@@ -538,7 +564,10 @@ internal static class GameDatabaseCsvSync
         {
             var asset = GetOrCreate<CharacterData>(database, existing, row.Id);
             asset.EditorSetIdentity(row.Id, row.Name);
-            asset.EditorApply(row.Class, row.MaxHealth, row.StartingEnergy, row.StartingDeck,
+            //시작 덱 열이 없는 시트는 기존 SO 편집값 유지
+            var startingDeck = row.DeriveCardLists && asset.StartingDeckIds.Count > 0
+                ? asset.StartingDeckIds.ToList() : row.StartingDeck;
+            asset.EditorApply(row.Class, row.MaxHealth, row.StartingEnergy, startingDeck,
                 row.CardPool, row.ResourceName);
             retained.Add(asset);
             EditorUtility.SetDirty(asset);
@@ -563,11 +592,15 @@ internal static class GameDatabaseCsvSync
             return asset;
         }).ToList();
 
+        var encounters = ApplyEncounterRows(database, input.Encounters, existing);
+        foreach (var encounter in encounters) retained.Add(encounter);
+
         // 시트에서 제거된 행, ID가 0으로 깨진 항목, 중복 ID 서브에셋까지 모두 정리합니다.
         foreach (var orphan in allExisting.Where(entry => !retained.Contains(entry)).ToArray())
             UnityEngine.Object.DestroyImmediate(orphan, true);
 
         database.EditorSetEntries(cards, characters, enemies, relics);
+        database.EditorSetEncounters(encounters);
         EditorUtility.SetDirty(database);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(DatabasePath, ImportAssetOptions.ForceUpdate);
@@ -708,7 +741,7 @@ internal static class GameDatabaseCsvSync
         {
             var parts = effectText.Split(':');
             if (parts.Length < 3 || parts.Length > 5 ||
-                !Enum.TryParse(parts[0].Trim(), true, out EffectType type) ||
+                !TryMapProjectEffect(parts[0], out EffectType type) ||
                 !Enum.TryParse(parts[1].Trim(), true, out TargetType target) ||
                 !int.TryParse(parts[2].Trim(), out var amount))
                 throw Error(table, row, $"{column} 효과 '{effectText}' 형식이 잘못되었습니다. Type:Target:Amount[:SecondaryAmount:Duration] 형식을 사용하세요.");
@@ -837,6 +870,7 @@ internal static class GameDatabaseCsvSync
         public List<CharacterRow> Characters;
         public List<EnemyRow> Enemies;
         public List<RelicRow> Relics;
+        public List<EncounterRow> Encounters;
     }
 
     private class CardRow
@@ -847,7 +881,8 @@ internal static class GameDatabaseCsvSync
         public CardType Type;
         public DataRarity Rarity;
         public int Cost;
-        public int ShopPrice;
+        public int UpgradeCost = -1;
+        public bool Exhaust;
         public List<EffectSpec> Effects, UpgradedEffects;
         public List<string> Keywords;
     }

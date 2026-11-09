@@ -10,12 +10,16 @@ public class BattlePopupManager : MonoBehaviour
     [SerializeField] private BattleClearPopupView clearPrefab;
     [SerializeField] private BattleCoinInstaller coinInstaller;
     [SerializeField] private BattleSceneController sceneController;
-    [SerializeField] private SceneMenuActions menu;
+    private SceneMenuActions menu;
     private CardListPanelView deckView;
     private BattleWinPopupView winView;
     private BattleDefeatPopupView defeatView;
     private BattleClearPopupView clearView;
     private OwnedDeckModel ownedDeck;
+    private OwnedRelicModel ownedRelics;
+
+    //세션 보유 유물 연결
+    public void InjectOwnedRelics(OwnedRelicModel relics) { ownedRelics = relics; }
     private IGameDataProvider data;
     private BattleDeckManager battleDeck;
     private BattleParticipants participants;
@@ -32,6 +36,18 @@ public class BattlePopupManager : MonoBehaviour
         participants = combatants;
         pool = objectPool;
         if (deckPrefab != null) _ = deckPrefab.PreparePoolAsync(pool);
+    }
+    //세션의 공통 메뉴 기능 받음
+    public void InjectMenuActions(SceneMenuActions actions)
+    {
+        if (actions == null)
+            throw new System.ArgumentNullException(nameof(actions));
+
+        menu = actions;
+
+        //이미 생성된 팝업에도 변경된 참조 전달
+        if (clearView != null) clearView.Inject(menu);
+        if (defeatView != null) defeatView.Inject(menu);
     }
 
     //비활성 프리팹의 초기화 완료 후 인스턴스 보관
@@ -88,8 +104,8 @@ public class BattlePopupManager : MonoBehaviour
             {
                 winView = Create(winPrefab);
                 coinInstaller.BindRewardView(winView.CoinButton, winView.CoinText);
-                sceneController.BindNextButton(winView.NextButton);
-                rewardPresenter = new CardRewardPresenter(data, participants, ownedDeck, winView.RewardView);
+                sceneController.BindWinPopup(winView);
+                rewardPresenter = new CardRewardPresenter(data, participants, ownedDeck, winView.RewardView, ownedRelics);
             }
             winView.transform.SetAsLastSibling();
             winView.gameObject.SetActive(true);

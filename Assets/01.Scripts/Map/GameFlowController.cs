@@ -1,65 +1,102 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 
 public enum GameFlowState { Map, Battle, Reward, Event, Defeat, Complete, Camp, Shop }
 
 //맵 씬의 지점 진행과 캠프 및 상점 화면 관리
 [DefaultExecutionOrder(100)]
-public class GameFlowController : MonoBehaviour
+public class GameFlowController : MonoBehaviour, IScenePreparation
 {
+    //맵 초기화와 목록 카드 풀 준비 완료 대기
+    public async UniTask PrepareSceneAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await initialization.Task.AttachExternalCancellation(cancellationToken);
+        if (!initialized) throw new System.InvalidOperationException("맵 초기화 실패");
+        if (!await objectPoolManager.EnsurePoolReadyAsync("ViewCardList")
+            .AsUniTask().AttachExternalCancellation(cancellationToken))
+            throw new System.InvalidOperationException("목록 카드 풀 준비 실패");
+    }
     [SerializeField] private GameDataProvider dataProvider;
     [SerializeField] private ObjectPoolManager objectPoolManager;
     [SerializeField] private GameObject mapPanel;
     [SerializeField] private MapPopupManager popups;
     [SerializeField] private PlayerHealthView commonHealthView;
     [SerializeField] private UnityEngine.UI.ScrollRect mapScroll;
-    [SerializeField] private TMP_Text mapTitle;
-    [Tooltip("진행할 지점 순서로 연결")]
-    [SerializeField] private MapNodeView[] nodes;
+    [SerializeField] private RandomMapView randomMap;
+    //실행 중 생성된 노드만 보관
+    private MapNodeView[] nodes;
     [SerializeField] private int playerId = 50001;
-    [Tooltip("비어 있으면 캐릭터 SO의 시작 덱 사용")]
-    [SerializeField] private int[] startingDeckIds;
 
     private RunProgressModel run;
     private OwnedDeckModel ownedDeck;
     private IRunSceneLoader sceneLoader;
     private bool initialized;
+    private readonly UniTaskCompletionSource initialization = new UniTaskCompletionSource();
     public GameFlowState State { get; private set; } = GameFlowState.Map;
     public IGameDataProvider Data => dataProvider;
+    //타이틀 선택 우선 적용과 맵 단독 실행 기본값
+    private int ActivePlayerId => run != null && run.PlayerId > 0 ? run.PlayerId : playerId;
 
     //세션의 진행과 코인 및 보유 덱과 씬 이동 기능 주입
-    public void InjectRun(RunProgressModel model, CoinModel coins, OwnedDeckModel cards, IRunSceneLoader loader)
+    public void InjectRun(RunProgressModel model, CoinModel coins, OwnedDeckModel cards, IRunSceneLoader loader, OwnedRelicModel relics)
     {
         run = model;
         ownedDeck = cards;
         sceneLoader = loader;
-        if (popups != null) popups.Inject(model, coins, cards, dataProvider, objectPoolManager);
+        if (popups != null) popups.Inject(model, coins, cards, dataProvider, objectPoolManager, relics);
     }
 
     //보유 덱과 체력 준비 및 기존 맵 진행 복원
     private void Start()
     {
+        //초기화 단일 실행과 로딩 화면에 완료 신호 전달
+        ObserveInitializationAsync().Forget();
+    }
+
+    //맵 단독 실행에서도 초기화 실패 기록
+    private async UniTask ObserveInitializationAsync()
+    {
+        try
+        {
+            await InitializeAsync(destroyCancellationToken);
+            initialization.TrySetResult();
+        }
+        catch (System.OperationCanceledException)
+        {
+            initialization.TrySetCanceled();
+        }
+        catch (System.Exception error)
+        {
+            initialization.TrySetException(error);
+            GameLogger.LogException(error, this);
+        }
+    }
+
+    //노드 프리팹 생성과 배치 완료 이후 맵 입력 허용
+    private async UniTask InitializeAsync(CancellationToken cancellationToken)
+    {
         if (!ValidateReferences())
         {
-            GameLogger.LogError("[맵] 데이터 공급자와 풀 및 패널과 지점 목록을 연결해 주세요", this);
-            return;
+            throw new System.InvalidOperationException("[맵] 데이터 공급자·풀·패널·Random Map View 연결과 콘텐츠 ID 확인 필요");
         }
-        CharacterData character = dataProvider.GetCharacter(playerId);
+        CharacterData character = dataProvider.GetCharacter(ActivePlayerId);
         if (!ownedDeck.IsInitialized)
         {
-            IEnumerable<int> ids = startingDeckIds != null && startingDeckIds.Length > 0
-                ? startingDeckIds : character.StartingDeckIds;
-            var validated = new List<int>(ids);
+            //선택한 캐릭터 SO의 시작 덱 복사
+            var validated = new List<int>(character.StartingDeckIds);
             if (validated.Count == 0 || validated.Exists(id => !dataProvider.TryGetCard(id, out _)))
             {
-                GameLogger.LogError("[맵] 시작 덱 카드 ID를 확인해 주세요", this);
-                return;
+                throw new System.InvalidOperationException("[맵] 시작 덱 카드 ID 확인 필요");
             }
             ownedDeck.InitializeOnce(validated);
         }
         run.PreparePlayer(character);
-        run.PrepareMap(nodes.Length);
+        run.PrepareMap(randomMap.Generate);
+        nodes = await randomMap.BuildAsync(run.Map, mapScroll, cancellationToken);
         if (commonHealthView != null) commonHealthView.InjectHealth(run.Health);
         for (int i = 0; i < nodes.Length; i++) nodes[i].Bind(i, SelectNode);
         initialized = true;
@@ -75,22 +112,10 @@ public class GameFlowController : MonoBehaviour
     {
         if (dataProvider == null || !dataProvider.IsReady || run == null || ownedDeck == null ||
             sceneLoader == null || objectPoolManager == null || mapPanel == null || popups == null || !popups.IsConfigured ||
-            mapScroll == null || mapScroll.content == null || mapTitle == null ||
-            nodes == null || nodes.Length == 0 || !dataProvider.TryGetCharacter(playerId, out _))
+            mapScroll == null || mapScroll.content == null || mapScroll.viewport == null || randomMap == null || !randomMap.IsConfigured ||
+            !dataProvider.TryGetCharacter(ActivePlayerId, out _))
             return false;
-        var unique = new HashSet<MapNodeView>();
-        foreach (MapNodeView node in nodes)
-        {
-            if (node == null || !node.IsConfigured || !unique.Add(node)) return false;
-            if ((node.NodeType == MapNodeType.Battle || node.NodeType == MapNodeType.Boss) &&
-                !dataProvider.TryGetEnemy(node.Value, out _)) return false;
-            if (node.NodeType == MapNodeType.Event && !popups.HasEvent(node.Value))
-            {
-                GameLogger.LogError($"[맵] {node.name}의 이벤트 ID {node.Value}를 데이터베이스에서 찾을 수 없습니다", node);
-                return false;
-            }
-        }
-        return true;
+        return randomMap.ValidateContent(dataProvider, popups.HasEvent);
     }
 
     //열린 지점 선택과 전투 씬 또는 비전투 패널 진입
@@ -161,9 +186,9 @@ public class GameFlowController : MonoBehaviour
         State = run.Map.IsFailed ? GameFlowState.Defeat :
             run.Map.IsComplete ? GameFlowState.Complete : GameFlowState.Map;
         SetPanels(true);
-        mapTitle.text = run.Map.IsFailed ? "진행 종료" : run.Map.IsComplete ? "지도 완료" : "지도";
         for (int i = 0; i < nodes.Length; i++)
-            nodes[i].Refresh(run.Map.CanEnter(i), i < run.Map.NextIndex);
+            nodes[i].Refresh(run.Map.CanEnter(i), run.Map.IsCompleted(i));
+        randomMap.RefreshRoutes();
     }
 
     //맵 표시 전환과 생성된 팝업 닫기

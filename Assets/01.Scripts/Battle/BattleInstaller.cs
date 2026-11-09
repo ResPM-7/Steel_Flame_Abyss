@@ -1,9 +1,24 @@
 using UnityEngine;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 
 //전투 구성 요소에 게임 데이터 공급자 연결
 [DefaultExecutionOrder(-100)]
-public class BattleInstaller : MonoBehaviour
+public class BattleInstaller : MonoBehaviour, IScenePreparation
 {
+    private bool startingRelicsApplied;
+
+    //첫 손패·유물·유닛 연결과 목록 카드 풀 준비 확인
+    public async UniTask PrepareSceneAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (participants == null || !participants.IsReady || handController == null ||
+            !handController.IsDisplayReady || !startingRelicsApplied)
+            throw new System.InvalidOperationException("전투 참가자 또는 첫 손패 준비 실패");
+        if (objectPoolManager == null || !await objectPoolManager.EnsurePoolReadyAsync("ViewCardList")
+            .AsUniTask().AttachExternalCancellation(cancellationToken))
+            throw new System.InvalidOperationException("전투 목록 카드 풀 준비 실패");
+    }
     [SerializeField] private GameDataProvider dataProvider;
     [SerializeField] private BattleDeckManager deckManager;
     [SerializeField] private CardHandController handController;
@@ -12,8 +27,44 @@ public class BattleInstaller : MonoBehaviour
     [SerializeField] private BattleResultView resultView;
     [SerializeField] private BattlePopupManager popups;
     [SerializeField] private ObjectPoolManager objectPoolManager;
+    [SerializeField] private BattleCardSoundFeedback cardSoundFeedback;
+    private SoundManager soundManager;
+
+    //공통 사운드 관리자와 카드 사용 연출 연결
+    public void InjectSound(SoundManager manager)
+    {
+        soundManager = manager;
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(cardPlayController, manager);
+    }
 
     private CardPlayController cardPlayController;
+    private BattleRelicEffects relicEffects;
+
+    //세션의 보유 유물과 전투 발동 시점 연결
+    public void InjectOwnedRelics(OwnedRelicModel ownedRelics)
+    {
+        if (popups != null) popups.InjectOwnedRelics(ownedRelics);
+        relicEffects = new BattleRelicEffects(ownedRelics, dataProvider, participants, handController);
+        deckManager.BattleStarted -= ApplyStartingRelics;
+        deckManager.BattleStarted += ApplyStartingRelics;
+        turnController.InjectRelics(relicEffects);
+        cardPlayController?.InjectRelics(relicEffects);
+    }
+
+    //기본 손패와 참가자 생성 후 전투 시작 및 첫 턴 유물 적용
+    private void ApplyStartingRelics()
+    {
+        relicEffects.Apply(RelicTrigger.BattleStart);
+        relicEffects.Apply(RelicTrigger.TurnStart);
+        startingRelicsApplied = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (deckManager != null) deckManager.BattleStarted -= ApplyStartingRelics;
+        cardPlayController?.InjectRelics(null);
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(null, null);
+    }
 
 #if UNITY_EDITOR
     //통합 에디터 치트창에 전투와 세션 의존성 주입
@@ -50,6 +101,8 @@ public class BattleInstaller : MonoBehaviour
         deckManager.Inject(dataProvider);
         participants.Inject(dataProvider, deckManager);
         cardPlayController = new CardPlayController(deckManager, participants);
+        if (cardSoundFeedback != null) cardSoundFeedback.Inject(cardPlayController, soundManager);
+        cardPlayController.InjectRelics(relicEffects);
         handController.Inject(deckManager, cardPlayController);
         turnController.Inject(deckManager, participants);
         participants.UseMapFlow();

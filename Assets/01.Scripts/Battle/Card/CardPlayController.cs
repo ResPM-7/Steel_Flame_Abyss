@@ -5,6 +5,33 @@ using System.Text.RegularExpressions;
 public class CardPlayController
 {
     private readonly IBattleDeckManager deckManager;
+    private BattleRelicEffects relicEffects;
+    private event System.Action costsChanged;
+    //사용 완료 카드와 실제 방어 증가 여부 전달
+    public event System.Action<CardInstance, CharacterClass, bool> CardPlayed;
+
+    //유물 교체 시 이전 비용 알림 해제 후 새 효과 연결
+    public void InjectRelics(BattleRelicEffects effects)
+    {
+        if (relicEffects != null) relicEffects.CostsChanged -= NotifyCostsChanged;
+        relicEffects = effects;
+        if (relicEffects != null) relicEffects.CostsChanged += NotifyCostsChanged;
+        NotifyCostsChanged();
+    }
+
+    //손패에 실제 사용 비용 표시
+    public int GetCardCost(CardInstance card) => relicEffects?.GetCardCost(card) ?? card.Cost;
+
+    //체력 결제 카드는 비용 배지에 HP 단위 표시
+    public string GetCardCostText(CardInstance card) => relicEffects?.UsesHealthForNextCard == true
+        ? $"HP {GetCardCost(card)}" : GetCardCost(card).ToString();
+
+    //비용 변경을 손패 갱신 구독자에게 전달
+    private void NotifyCostsChanged() => costsChanged?.Invoke();
+
+    //카드 체력 소모 사건을 현재 유물 효과에 전달
+    private void OnCardHealthLost(int lost) => relicEffects?.OnCardHealthLost(lost);
+
     private readonly BattleParticipants participants;
     private readonly CardEffectResolver effectResolver;
     private static readonly Regex damageTextPattern = new Regex(@"(?<![\d.])\d+(?=\s*의?\s*피해)");
@@ -13,12 +40,12 @@ public class CardPlayController
 
     public event System.Action DescriptionsChanged
     {
-        add { participants.StrengthChanged += value; }
-        remove { participants.StrengthChanged -= value; }
+        add { participants.DamagePreviewChanged += value; costsChanged += value; }
+        remove { participants.DamagePreviewChanged -= value; costsChanged -= value; }
     }
 
     //카드 설명의 효과 키워드를 현재 효과 수치로 변환
-    public string GetDescription(CardInstance card)
+    public string GetDescription(CardInstance card, BattleCombatantView previewTarget = null)
     {
         if (card == null)
             return string.Empty;
@@ -38,17 +65,35 @@ public class CardPlayController
 
         if (damageCount == 1)
         {
-            string damage = effectResolver.CalculateDamage(card, damageEffect).ToString();
+            string damage = GetPreviewDamage(card, damageEffect, previewTarget).ToString();
             string baseDamage = damageEffect.Amount.ToString();
             description = damageTextPattern.Replace(description,
                 match => match.Value == baseDamage ? damage : match.Value);
         }
 
-        return effectTextPattern.Replace(description, match => GetEffectText(card, match));
+        description = effectTextPattern.Replace(description, match => GetEffectText(card, match, previewTarget));
+        return CardDescriptionFormatter.FormatEffectSlots(description, card.Effects,
+            effect => effect.Type == EffectType.Damage
+                ? GetPreviewDamage(card, effect, previewTarget) : effect.Amount);
+    }
+
+    //단일 적 카드의 드래그 대상에만 취약 보정 반영
+    private int GetPreviewDamage(CardInstance card, EffectSpec effect, BattleCombatantView previewTarget)
+    {
+        var context = new CardEffectContext(card, deckManager, participants);
+        if (effect.Target != TargetType.SingleEnemy)
+            return context.CalculateDamage(effect);
+
+        int damage = context.CalculateBaseDamage(effect);
+        CombatantState attacker = participants.Player?.Stats;
+        if (participants.TryGetEnemy(previewTarget, out var enemy))
+            return enemy.Stats.CalculateAttackDamage(damage, attacker);
+
+        return System.Math.Max(0, damage - (attacker?.Weak ?? 0));
     }
 
     //설명 키워드에 해당하는 효과 수치 반환
-    private string GetEffectText(CardInstance card, Match match)
+    private string GetEffectText(CardInstance card, Match match, BattleCombatantView previewTarget)
     {
         EffectType effectType;
         switch (match.Groups["token"].Value)
@@ -79,7 +124,7 @@ public class CardPlayController
             }
 
             if (effectType == EffectType.Damage)
-                return effectResolver.CalculateDamage(card, effect).ToString();
+                return GetPreviewDamage(card, effect, previewTarget).ToString();
 
             return effect.Amount.ToString();
         }
@@ -103,13 +148,14 @@ public class CardPlayController
     //카드 대상과 위치 및 에너지를 검사한 뒤 카드 사용
     public bool TryPlayCard(CardInstance card, BattleCombatantView targetView, bool raisedEnough)
     {
+        if (SceneTransitionController.BlocksGameplay) return false;
         if (!participants.IsBattleActive ||
             !deckManager.ContainsInHand(card))
             return false;
 
         bool requiresEnemyTarget = RequiresEnemyTarget(card);
-        if (requiresEnemyTarget &&
-            (targetView != participants.EnemyView || !participants.Enemy.Stats.IsAlive))
+        bool validEnemy = participants.TryGetEnemy(targetView, out var selectedEnemy);
+        if (requiresEnemyTarget && !validEnemy)
             return false;
         if (!requiresEnemyTarget && !raisedEnough)
             return false;
@@ -118,25 +164,41 @@ public class CardPlayController
             GameLogger.LogWarning($"[카드 사용] {card.Data.DisplayName} 효과는 아직 지원하지 않습니다");
             return false;
         }
-        if (participants.Player.Energy < card.Cost)
+        int cost = GetCardCost(card);
+        bool payHealth = relicEffects?.UsesHealthForNextCard == true;
+        if (payHealth)
+        {
+            //비용 결제로 사망하지 않도록 HP 최소 1 유지
+            if (participants.Player.Stats.CurrentHealth <= cost)
+            {
+                GameLogger.LogWarning($"[카드 사용] {card.Data.DisplayName} 카드의 체력이 부족합니다");
+                return false;
+            }
+        }
+        else if (participants.Player.Energy < cost)
         {
             GameLogger.LogWarning($"[카드 사용] {card.Data.DisplayName} 카드의 에너지가 부족합니다");
             return false;
         }
-        if (!participants.Player.TrySpendEnergy(card.Cost))
-            return false;
 
-        effectResolver.Resolve(card);
+        if (!payHealth && !participants.Player.TrySpendEnergy(cost)) return false;
+        //검증 완료 후 첫 카드 예약 소모, 결제에 따른 상태 알림보다 먼저 반영
+        relicEffects?.ConsumeCardDiscount();
+        if (payHealth) participants.Player.Stats.LoseHealth(cost);
+        int blockBefore = participants.Player.Stats.Block;
+        effectResolver.Resolve(card, selectedEnemy, OnCardHealthLost);
+        bool gainedBlock = participants.Player.Stats.Block > blockBefore;
         bool exhaust = HasExhaustEffect(card);
         if (!deckManager.FinishPlayingCard(card, exhaust))
             return false;
 
+        CardPlayed?.Invoke(card, participants.Player.Data.Class, gainedBlock);
         GameLogger.Log($"[카드 사용] {card.Data.DisplayName} 사용");
         return true;
     }
 
     //단일 적 선택 효과 포함 여부 확인
-    private static bool RequiresEnemyTarget(CardInstance card)
+    public static bool RequiresEnemyTarget(CardInstance card)
     {
         for (int index = 0; index < card.Effects.Count; index++)
         {
@@ -147,9 +209,27 @@ public class CardPlayController
         return false;
     }
 
+    //살아 있는 적의 전체 UI 영역에서 포인터 대상 탐색
+    public BattleCombatantView FindTarget(Vector2 screenPosition)
+    {
+        if (!participants.IsBattleActive || SceneTransitionController.BlocksGameplay) return null;
+        for (int index = participants.EnemyViews.Count - 1; index >= 0; index--)
+        {
+            var view = participants.EnemyViews[index];
+            if (view != null && view.isActiveAndEnabled && participants.TryGetEnemy(view, out _) &&
+                view.ContainsScreenPoint(screenPosition)) return view;
+        }
+        return null;
+    }
+
+    //전투 종료와 손패 변경 시 조작 중단 여부 확인
+    public bool CanKeepSelecting(CardInstance card) => !SceneTransitionController.BlocksGameplay &&
+        participants.IsBattleActive && deckManager.ContainsInHand(card);
+
     //사용 후 소멸 효과 포함 여부 확인
     private static bool HasExhaustEffect(CardInstance card)
     {
+        if (card.Data.Exhaust) return true;
         for (int index = 0; index < card.Effects.Count; index++)
         {
             if (card.Effects[index].Type == EffectType.Exhaust)

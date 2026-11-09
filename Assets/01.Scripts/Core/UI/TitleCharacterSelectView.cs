@@ -1,0 +1,121 @@
+using System;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.Events;
+
+//타이틀 캐릭터 선택 패널과 새 게임 입력 연결
+public class TitleCharacterSelectView : MonoBehaviour
+{
+    //캐릭터 버튼과 선택 가능 여부 설정
+    [Serializable]
+    public class Choice
+    {
+        public UnityEngine.UI.Button button;
+        public CharacterData character;
+        [NonSerialized] public UnityAction listener;
+    }
+
+    [SerializeField] private GameObject titleButtons;
+    [SerializeField] private GameObject selectionPanel;
+    [SerializeField] private UnityEngine.UI.Button startButton;
+    [SerializeField] private UnityEngine.UI.Button exitButton;
+    [SerializeField] private GameDatabase database;
+    [SerializeField] private Choice[] choices;
+    private GameSession session;
+    private SceneMenuActions menuActions;
+    private bool starting;
+
+    //초기 화면과 버튼 콜백 준비
+    private void Awake()
+    {
+        selectionPanel.SetActive(false);
+        titleButtons.SetActive(true);
+        startButton.onClick.AddListener(ShowSelection);
+        if (exitButton != null) exitButton.onClick.AddListener(ExitGame);
+        foreach (var choice in choices)
+        {
+            var captured = choice;
+            choice.listener = () => Select(captured);
+            choice.button.onClick.AddListener(choice.listener);
+        }
+        RefreshButtons();
+    }
+
+    //씬 세션 주입과 선택 입력 준비
+    public void Inject(GameSession value)
+    {
+        session = value;
+        RefreshButtons();
+        RefreshAfterLoadingAsync(value).Forget();
+    }
+
+    //타이틀 외부 Exit 버튼에 공통 메뉴 기능 연결
+    public void InjectMenuActions(SceneMenuActions actions)
+    {
+        menuActions = actions;
+    }
+
+    //설정 저장 후 공통 게임 종료 요청
+    private void ExitGame()
+    {
+        if (menuActions == null)
+        {
+            GameLogger.LogError("[타이틀] 공통 메뉴가 주입되지 않았습니다", this);
+            return;
+        }
+        GameSettings.Save();
+        menuActions.ExitGame();
+    }
+
+    //타이틀 복귀 로딩 완료 후 버튼 갱신, 씬 제거 시 대기 취소
+    private async UniTask RefreshAfterLoadingAsync(GameSession injectedSession)
+    {
+        if (injectedSession == null) return;
+        bool canceled = await UniTask.WaitUntil(
+            () => injectedSession == null || !injectedSession.IsLoading,
+            cancellationToken: destroyCancellationToken).SuppressCancellationThrow();
+        if (canceled || this == null || session != injectedSession || injectedSession == null) return;
+        RefreshButtons();
+    }
+
+    //타이틀 버튼 숨김과 캐릭터 선택 패널 표시
+    public void ShowSelection()
+    {
+        if (session == null || starting || session.IsLoading) return;
+        titleButtons.SetActive(false);
+        selectionPanel.SetActive(true);
+        RefreshButtons();
+    }
+
+    //사용 가능한 캐릭터로 새 게임 요청과 중복 입력 차단
+    private void Select(Choice choice)
+    {
+        if (session == null || starting || session.IsLoading || !selectionPanel.activeInHierarchy ||
+             choice.character == null) return;
+        starting = true;
+        RefreshButtons();
+        if (session.TryStartNewGame(choice.character, database)) return;
+        starting = false;
+        RefreshButtons();
+    }
+
+    //미구현 캐릭터와 로딩 중 버튼 비활성화
+    private void RefreshButtons()
+    {
+        bool ready = session != null && !starting && !session.IsLoading;
+        startButton.interactable = ready;
+        foreach (var choice in choices)
+            choice.button.interactable = ready && choice.character != null;
+    }
+
+    //씬 종료 시 등록한 버튼 콜백 해제
+    private void OnDestroy()
+    {
+        if (startButton != null) startButton.onClick.RemoveListener(ShowSelection);
+        if (exitButton != null) exitButton.onClick.RemoveListener(ExitGame);
+        if (choices == null) return;
+        foreach (var choice in choices)
+            if (choice.button != null && choice.listener != null)
+                choice.button.onClick.RemoveListener(choice.listener);
+    }
+}
