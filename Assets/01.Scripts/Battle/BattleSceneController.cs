@@ -18,7 +18,7 @@ public class BattleSceneController : MonoBehaviour
     private IRunSceneLoader loader;
     private BattleWinPopupView winPopup;
 
-    //동적 승리창의 퇴장 연출과 다음 버튼 연결
+    //동적 승리창의 입력 제어와 다음 버튼 연결
     public void BindWinPopup(BattleWinPopupView popup)
     {
         winPopup = popup;
@@ -80,7 +80,7 @@ public class BattleSceneController : MonoBehaviour
         if (IsFinalBossBattle || loader == null || loader.IsLoading || participants.Result != BattleResult.Victory) return;
         if (winPopup != null)
         {
-            winPopup.HideAndContinue(TryContinueAfterReward);
+            winPopup.ContinueImmediately(TryContinueAfterReward);
             return;
         }
         TryContinueAfterReward();

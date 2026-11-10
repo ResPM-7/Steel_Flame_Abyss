@@ -693,7 +693,6 @@ MonoBehaviour:
   descriptionText: {fileID: 3351995169905398885}
   cardOutline: {fileID: 2045801052349654704}
   rarityColors: {fileID: 11400000, guid: e0defc3e1e6025c4aad9d154bc69d95b, type: 2}
-  classFrame: {fileID: 7732219041713826952}
   artworkWell: {fileID: 8320063824008476938}
   typeText: {fileID: 92078895606924428}
   steelColor: {r: 0.38, g: 0.63, b: 0.82, a: 1}

@@ -30,7 +30,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4063829718150307256}
+  m_Father: {fileID: 1886823810873507822}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -392,7 +392,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1886823810873507822}
-  - {fileID: 2066864825583861755}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -417,7 +416,6 @@ MonoBehaviour:
   descriptionText: {fileID: 3351995169905398885}
   cardOutline: {fileID: 5083155878804296538}
   rarityColors: {fileID: 11400000, guid: e0defc3e1e6025c4aad9d154bc69d95b, type: 2}
-  classFrame: {fileID: 0}
   artworkWell: {fileID: 7037193744732656009}
   typeText: {fileID: 440827096990319523}
   steelColor: {r: 0.38, g: 0.63, b: 0.82, a: 1}
@@ -459,6 +457,7 @@ RectTransform:
   - {fileID: 8022972383046279906}
   - {fileID: 4976160388594681933}
   - {fileID: 1496778651970693216}
+  - {fileID: 2066864825583861755}
   m_Father: {fileID: 4063829718150307256}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
