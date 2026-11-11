@@ -13,10 +13,12 @@ public class BattleUnitPortraitView : MonoBehaviour
     private CombatantState state;
     private bool dead;
     private bool subscribed;
+    private bool hideAfterDeath;
     public bool HasVisual => instance != null;
 
     //표시 프리팹 생성과 전투 상태 연결
-    public void Bind(UnityEngine.UI.Image target, GameObject prefab, CombatantState value, bool lookLeft = false)
+    public void Bind(UnityEngine.UI.Image target, GameObject prefab, CombatantState value, bool lookLeft = false,
+        bool hideOnDeath = false)
     {
         Unsubscribe();
         if (instance != null)
@@ -36,6 +38,7 @@ public class BattleUnitPortraitView : MonoBehaviour
         portrait = target;
         state = value;
         dead = false;
+        hideAfterDeath = hideOnDeath;
         faceLeft = lookLeft;
         if (prefab == null || target == null) return;
 
@@ -67,6 +70,13 @@ public class BattleUnitPortraitView : MonoBehaviour
     //SpriteResolver 처리 이후 프레임과 피격 색상 반영
     private void LateUpdate()
     {
+        //적 사망 연출 완료 후 체력바와 행동 표시까지 함께 숨김
+        if (hideAfterDeath && dead && state != null && !state.IsAlive &&
+            animationView != null && animationView.IsDeathComplete)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
         if (spriteRenderer == null || animatedImage == null || spriteRenderer.sprite == null) return;
         animatedImage.sprite = spriteRenderer.sprite;
         animatedImage.color = spriteRenderer.color;

@@ -57,7 +57,8 @@ public class BattleCombatantView : MonoBehaviour
     public CombatantState State => state;
 
     //전투 상태와 표시 데이터 연결 및 초상화 대상 감지 활성화
-    public void Bind(string displayName, Sprite sprite, CombatantState value, GameObject battlePrefab = null, bool faceLeft = false)
+    public void Bind(string displayName, Sprite sprite, CombatantState value, GameObject battlePrefab = null,
+        bool faceLeft = false, bool hideAfterDeath = false)
     {
         if (state != null) state.Changed -= Refresh;
 
@@ -76,7 +77,7 @@ public class BattleCombatantView : MonoBehaviour
         else
         {
             if (unitPortrait == null) unitPortrait = gameObject.AddComponent<BattleUnitPortraitView>();
-            unitPortrait.Bind(portrait, battlePrefab, state, faceLeft);
+            unitPortrait.Bind(portrait, battlePrefab, state, faceLeft, hideAfterDeath);
         }
 
         //인스펙터에 추가한 피해 연출 컴포넌트에 전투 상태 전달
