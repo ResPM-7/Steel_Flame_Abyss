@@ -100,6 +100,10 @@ internal static class GameDatabaseSheetUpload
         var row = NewRow(encounter);
         Add(row, "encounterId", encounter.Id.ToString(CultureInfo.InvariantCulture));
         Add(row, "encounterName", encounter.DisplayName);
+        if (encounter.MinRewardCoins < 0 || encounter.MaxRewardCoins < encounter.MinRewardCoins)
+            throw new InvalidOperationException($"전투 편성 '{encounter.Id}'의 코인 보상 범위를 확인해 주세요.");
+        Add(row, "minRewardCoins", encounter.MinRewardCoins.ToString(CultureInfo.InvariantCulture));
+        Add(row, "maxRewardCoins", encounter.MaxRewardCoins.ToString(CultureInfo.InvariantCulture));
         for (int slot = 0; slot < 3; slot++)
         {
             int enemyId = encounter.EnemyIds[slot];

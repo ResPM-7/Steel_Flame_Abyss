@@ -55,6 +55,7 @@ public class BattleParticipants : MonoBehaviour
     //기존 디버그와 보상 코드의 전투 식별용 첫 적
     public EnemyBattleState Enemy => enemies.FirstOrDefault();
     public int EncounterId { get; private set; }
+    public EncounterData Encounter { get; private set; }
     public EnemyBattleState FirstAliveEnemy => enemies.FirstOrDefault(enemy => enemy.Stats.IsAlive);
 
     //살아 있는 적 중 무작위 대상 선택
@@ -143,7 +144,7 @@ public class BattleParticipants : MonoBehaviour
             GameLogger.LogError($"[전투] 편성 {encounterId}를 찾지 못했습니다", this);
             return false;
         }
-        return InitializeEnemies(characterId, encounter.EnemyIds, false, currentHealth, encounterId);
+        return InitializeEnemies(characterId, encounter.EnemyIds, false, currentHealth, encounterId, encounter);
     }
 
     //기존 단일 적 테스트 진입점
@@ -152,7 +153,7 @@ public class BattleParticipants : MonoBehaviour
 
     //배치와 데이터 검증 후 개별 상태 및 외형 생성
     private bool InitializeEnemies(int characterId, IReadOnlyList<int> ids, bool preserveHealth,
-        int? currentHealth, int encounterId)
+        int? currentHealth, int encounterId, EncounterData encounter = null)
     {
         if (dataProvider == null || !dataProvider.IsReady || playerView == null ||
             playerEnergyStatus == null || deckManager == null || deckCountText == null ||
@@ -183,6 +184,7 @@ public class BattleParticipants : MonoBehaviour
         enemyViews.Clear();
         Player = nextPlayer;
         EncounterId = encounterId;
+        Encounter = encounter;
         Result = BattleResult.Inactive;
         for (int index = 0; index < definitions.Count; index++)
         {

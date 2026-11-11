@@ -11,6 +11,8 @@ internal static partial class GameDatabaseCsvSync
     {
         var idColumn = ProjectIdHeader(table, "encounterId");
         table.Require(idColumn, "encounterName", "enemyId1", "enemyId2", "enemyId3", "enabled");
+        bool hasRewards = table.Has("minRewardCoins") || table.Has("maxRewardCoins");
+        if (hasRewards) table.Require("minRewardCoins", "maxRewardCoins");
         var rows = new List<EncounterRow>();
         for (int row = 0; row < table.RowCount; row++)
         {
@@ -20,11 +22,17 @@ internal static partial class GameDatabaseCsvSync
                 ids[slot] = NonNegativeInt(table, row, $"enemyId{slot + 1}");
             if (ids.All(id => id == 0))
                 throw Error(table, row, "전투 편성에는 적이 한 마리 이상 필요합니다.");
+            int? min = hasRewards ? NonNegativeInt(table, row, "minRewardCoins") : (int?)null;
+            int? max = hasRewards ? NonNegativeInt(table, row, "maxRewardCoins") : (int?)null;
+            if (min.HasValue && max.Value < min.Value)
+                throw Error(table, row, "최대 보상 코인은 최소 보상 코인 이상이어야 합니다.");
             rows.Add(new EncounterRow
             {
                 Id = PositiveInt(table, row, idColumn),
                 Name = Required(table, row, "encounterName"),
-                EnemyIds = ids
+                EnemyIds = ids,
+                MinRewardCoins = min,
+                MaxRewardCoins = max
             });
         }
         EnsureUnique(rows.Select(x => x.Id), "전투 편성 시트");
@@ -48,7 +56,7 @@ internal static partial class GameDatabaseCsvSync
         {
             var asset = GetOrCreate<EncounterData>(database, existing, row.Id);
             asset.EditorSetIdentity(row.Id, row.Name);
-            asset.EditorApply(row.EnemyIds);
+            asset.EditorApply(row.EnemyIds, row.MinRewardCoins, row.MaxRewardCoins);
             EditorUtility.SetDirty(asset);
             return asset;
         }).ToList();
@@ -80,5 +88,7 @@ internal static partial class GameDatabaseCsvSync
         public int Id;
         public string Name;
         public int[] EnemyIds;
+        public int? MinRewardCoins;
+        public int? MaxRewardCoins;
     }
 }
