@@ -50,6 +50,7 @@ public class BattleCombatantView : MonoBehaviour
     }
 
     private CombatantState state;
+    private PlayerBattleState playerState;
     private string detail = string.Empty;
     private Color aliveColor;
     private BattleStatusBarView statusBar;
@@ -58,9 +59,11 @@ public class BattleCombatantView : MonoBehaviour
 
     //전투 상태와 표시 데이터 연결 및 초상화 대상 감지 활성화
     public void Bind(string displayName, Sprite sprite, CombatantState value, GameObject battlePrefab = null,
-        bool faceLeft = false, bool hideAfterDeath = false)
+        bool faceLeft = false, bool hideAfterDeath = false, PlayerBattleState player = null)
     {
         if (state != null) state.Changed -= Refresh;
+        if (playerState != null) playerState.Changed -= Refresh;
+        playerState = player;
 
         SetTargetHighlight(false);
         state = value;
@@ -84,6 +87,7 @@ public class BattleCombatantView : MonoBehaviour
         if (TryGetComponent<BattleDamageFeedback>(out var feedback)) feedback.Bind(state);
 
         if (state != null && isActiveAndEnabled) state.Changed += Refresh;
+        if (playerState != null && isActiveAndEnabled) playerState.Changed += Refresh;
         Refresh();
     }
 
@@ -98,6 +102,7 @@ public class BattleCombatantView : MonoBehaviour
     private void OnEnable()
     {
         if (state != null) state.Changed += Refresh;
+        if (playerState != null) playerState.Changed += Refresh;
         Refresh();
     }
 
@@ -106,6 +111,7 @@ public class BattleCombatantView : MonoBehaviour
     {
         SetTargetHighlight(false);
         if (state != null) state.Changed -= Refresh;
+        if (playerState != null) playerState.Changed -= Refresh;
         if (statusBar != null) statusBar.HideTooltip();
     }
 
@@ -129,7 +135,7 @@ public class BattleCombatantView : MonoBehaviour
             statusLabel.text = string.Empty;
             statusLabel.enabled = false;
         }
-        if (statusBar != null) statusBar.Refresh(state);
+        if (statusBar != null) statusBar.Refresh(state, playerState);
         if (portrait != null && playerRender == null && (unitPortrait == null || !unitPortrait.HasVisual))
             portrait.color = state.IsAlive ? aliveColor : new Color(0.3f, 0.3f, 0.3f, 0.5f);
     }

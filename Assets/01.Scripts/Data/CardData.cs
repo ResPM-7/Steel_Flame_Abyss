@@ -4,6 +4,7 @@ using UnityEngine;
 //카드 한 장의 비용 효과 강화 효과와 표시 리소스를 보관
 public class CardData : GameDataEntry
 {
+    [SerializeField] private Sprite artwork;
     [SerializeField] private CharacterClass owner;
     [SerializeField] private CardType cardType;
     [SerializeField] private DataRarity rarity;
@@ -15,7 +16,6 @@ public class CardData : GameDataEntry
     [SerializeField] private List<EffectSpec> effects = new();
     [SerializeField] private List<EffectSpec> upgradedEffects = new();
     [SerializeField] private List<string> keywords = new();
-    [SerializeField] private Sprite artwork;
 
     public CharacterClass Owner => owner;
     public CardType CardType => cardType;
@@ -31,6 +31,9 @@ public class CardData : GameDataEntry
     public Sprite Artwork => artwork;
 
 #if UNITY_EDITOR
+    //파일 번호로 찾은 카드 일러스트 연결
+    public void EditorSetArtwork(Sprite sprite) => artwork = sprite;
+
     //검증된 카드 시트의 기본 정보와 효과를 서브에셋에 반영
     public void EditorApply(CharacterClass newOwner, CardType newCardType, DataRarity newRarity, int newCost,
         string newDescription, string newUpgradedDescription, List<EffectSpec> newEffects,

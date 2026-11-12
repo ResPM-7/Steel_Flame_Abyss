@@ -1,7 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-//모든 카드의 공통 텍스트와 희귀도 테두리 표시
+//모든 카드의 공통 텍스트와 일러스트 및 희귀도 테두리 표시
 public class CardDisplayView : MonoBehaviour
 {
     [SerializeField] protected TMP_Text nameText;
@@ -36,7 +36,7 @@ public class CardDisplayView : MonoBehaviour
         cardOutline.raycastTarget = false;
     }
 
-    //직업별 프레임 색상과 카드 종류 표시, 일러스트 영역 비워두기
+    //직업별 프레임 색상과 카드 종류 및 일러스트 표시
     private void ApplyDesign(CardData data)
     {
         Color accent = data.Owner switch
@@ -51,7 +51,7 @@ public class CardDisplayView : MonoBehaviour
             ? (rarityColors != null ? rarityColors.GetColor(data.Rarity) : new Color(0.88f, 0.69f, 0.3f))
             : accent;
         if (cardOutline != null) cardOutline.color = emphasis;
-        if (artworkWell != null) artworkWell.color = Color.Lerp(new Color(0.055f, 0.06f, 0.08f), accent, 0.1f);
+        ApplyArtwork(data.Artwork, accent);
         if (typeText != null)
         {
             typeText.color = accent;
@@ -64,6 +64,21 @@ public class CardDisplayView : MonoBehaviour
                 _ => data.CardType.ToString()
             };
         }
+    }
+
+    //등록된 일러스트의 원본 색상과 비율 유지, 미등록 시 빈 배경 표시
+    private void ApplyArtwork(Sprite artwork, Color accent)
+    {
+        if (artworkWell == null) return;
+        artworkWell.overrideSprite = null;
+        artworkWell.sprite = artwork;
+        artworkWell.type = UnityEngine.UI.Image.Type.Simple;
+        artworkWell.preserveAspect = artwork != null;
+        artworkWell.color = artwork != null
+            ? Color.white
+            : Color.Lerp(new Color(0.055f, 0.06f, 0.08f), accent, 0.1f);
+        artworkWell.raycastTarget = false;
+        artworkWell.enabled = true;
     }
 
 }

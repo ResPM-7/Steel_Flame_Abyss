@@ -550,12 +550,14 @@ internal static partial class GameDatabaseCsvSync
             if (allExisting.Any(x => x.Id == row.Id && !(x is EncounterData)))
                 throw new InvalidDataException($"전투 편성 ID '{row.Id}'가 다른 데이터 ID와 중복됩니다.");
         var retained = new HashSet<GameDataEntry>();
+        var cardArtworks = FindCardArtworks();
         var cards = input.Cards.Select(row =>
         {
             var asset = GetOrCreate<CardData>(database, existing, row.Id);
             asset.EditorSetIdentity(row.Id, row.Name);
             asset.EditorApply(row.Owner, row.Type, row.Rarity, row.Cost, row.Description,
                 row.UpgradedDescription, row.Effects, row.UpgradedEffects, row.Keywords, row.UpgradeCost, row.Exhaust);
+            if (cardArtworks.TryGetValue(row.Id, out var artwork)) asset.EditorSetArtwork(artwork);
             retained.Add(asset);
             EditorUtility.SetDirty(asset);
             return asset;
@@ -852,6 +854,41 @@ internal static partial class GameDatabaseCsvSync
 
     private static InvalidDataException Error(CsvTable table, int row, string message) =>
         new($"CSV {table.SourceLine(row)}행: {message}");
+
+    //카드 이미지 폴더를 한 번 검색하고 파일 번호별 Sprite 보관
+    private static Dictionary<int, Sprite> FindCardArtworks()
+    {
+        const string folder = "Assets/05.Art/Card";
+        var result = new Dictionary<int, Sprite>();
+        if (!AssetDatabase.IsValidFolder(folder)) return result;
+
+        var ambiguousIds = new HashSet<int>();
+        foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            string name = Path.GetFileNameWithoutExtension(path);
+            if (!int.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out int id) || id <= 0)
+                continue;
+            if (ambiguousIds.Contains(id)) continue;
+            var sprites = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().ToArray();
+            if (sprites.Length != 1)
+            {
+                Debug.LogWarning($"[카드 일러스트] {path}: Sprite가 한 개 필요합니다. Texture Type과 Sprite Mode를 확인해 주세요.");
+                result.Remove(id);
+                ambiguousIds.Add(id);
+                continue;
+            }
+            if (result.ContainsKey(id))
+            {
+                Debug.LogWarning($"[카드 일러스트] 파일 번호 {id} 중복으로 자동 연결을 건너뜁니다.");
+                result.Remove(id);
+                ambiguousIds.Add(id);
+                continue;
+            }
+            result.Add(id, sprites[0]);
+        }
+        return result;
+    }
 
     private static void EnsureFolder(string path)
     {

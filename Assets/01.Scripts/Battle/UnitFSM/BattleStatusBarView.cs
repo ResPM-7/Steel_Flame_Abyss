@@ -4,7 +4,7 @@ using UnityEngine;
 //전투 상태 아이콘과 설명창 생성 및 재사용
 public class BattleStatusBarView : MonoBehaviour
 {
-    private readonly BattleStatusItemView[] items = new BattleStatusItemView[6];
+    private readonly BattleStatusItemView[] items = new BattleStatusItemView[8];
     private readonly Vector3[] corners = new Vector3[4];
     private RectTransform tooltip;
     private TMP_Text tooltipText;
@@ -37,11 +37,13 @@ public class BattleStatusBarView : MonoBehaviour
         bar.items[3] = bar.CreateItem("취약", "받는 공격 피해 50% 증가.\n수치는 남은 턴. 자신의 턴 종료 시 1 감소.", new Color(0.38f, 0.22f, 0.48f), icons != null ? icons.Vulnerable : null);
         bar.items[4] = bar.CreateItem("정신\n분열", "수치가 적의 현재 체력 이상이면 처형.\n부여·증가 직후와 턴 종료 화상 처리 후 검사.", new Color(0.24f, 0.16f, 0.42f), icons != null ? icons.MindFracture : null);
         bar.items[5] = bar.CreateItem("힘", "공격 피해에 힘 수치만큼 추가.", new Color(0.55f, 0.22f, 0.2f), icons != null ? icons.Strength : null);
+        bar.items[6] = bar.CreateItem("힘\n증가", "매 턴 시작 시 힘을 {amount} 얻습니다.\n이번 전투 동안 지속됩니다.", new Color(0.55f, 0.32f, 0.12f), icons != null ? icons.TurnStartStrength : null, true);
+        bar.items[7] = bar.CreateItem("화상\n부여", "매 턴 시작 시 모든 생존 적에게 화상을 {amount} 부여합니다.\n이번 전투 동안 지속됩니다.", new Color(0.65f, 0.25f, 0.08f), icons != null ? icons.TurnStartBurn : null, true);
         return bar;
     }
 
     //살아 있는 유닛의 활성 상태만 표시
-    public void Refresh(CombatantState state)
+    public void Refresh(CombatantState state, PlayerBattleState player = null)
     {
         items[0].Refresh(state.IsAlive ? state.Burn : 0);
         items[1].Refresh(state.IsAlive ? state.BurnRetaliation : 0);
@@ -49,6 +51,8 @@ public class BattleStatusBarView : MonoBehaviour
         items[3].Refresh(state.IsAlive ? state.Vulnerable : 0);
         items[4].Refresh(state.IsAlive ? state.MindFracture : 0);
         items[5].Refresh(state.IsAlive ? state.Strength : 0);
+        items[6].Refresh(state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Strength, TargetType.Self) : 0);
+        items[7].Refresh(state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Burn, TargetType.AllEnemies) : 0);
         //활성 버프·디버프 수에 따라 기존 영역 안으로 폭 조정
         int count = 0;
         foreach (var item in items)
@@ -59,7 +63,8 @@ public class BattleStatusBarView : MonoBehaviour
     }
 
     //공용 아이콘과 오른쪽 수치 표시, 미지정 시 이름 표시
-    private BattleStatusItemView CreateItem(string title, string description, Color color, Sprite sprite)
+    private BattleStatusItemView CreateItem(string title, string description, Color color, Sprite sprite,
+        bool descriptionOnly = false)
     {
         RectTransform root = NewRect(title.Replace("\n", ""), transform);
         root.sizeDelta = new Vector2(100f, 44f);
@@ -83,7 +88,7 @@ public class BattleStatusBarView : MonoBehaviour
         number.rectTransform.anchorMin = new Vector2(0.7f, 0);
         number.text = "0";
         var item = root.gameObject.AddComponent<BattleStatusItemView>();
-        item.Initialize(this, number, title.Replace("\n", " "), description);
+        item.Initialize(this, number, descriptionOnly ? string.Empty : title.Replace("\n", " "), description);
         root.gameObject.SetActive(false);
         return item;
     }
@@ -112,7 +117,10 @@ public class BattleStatusBarView : MonoBehaviour
     public void ShowTooltip(BattleStatusItemView item, string title, string description, string amount)
     {
         tooltipOwner = item;
-        tooltipText.text = $"<size=26>{title}  {amount}</size>\n{description}";
+        string details = description.Replace("{amount}", amount);
+        tooltipText.text = string.IsNullOrEmpty(title)
+            ? details
+            : $"<size=26>{title}  {amount}</size>\n{details}";
         tooltip.gameObject.SetActive(true);
         tooltip.SetAsLastSibling();
         Canvas.ForceUpdateCanvases();
