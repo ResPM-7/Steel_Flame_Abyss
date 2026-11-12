@@ -20,10 +20,12 @@ public class BattleStatusItemView : MonoBehaviour, IPointerEnterHandler, IPointe
         description = details;
     }
 
-    //수치 변경과 효과 종료 반영
+    //새 효과는 표시 줄 끝에 추가, 중첩 수치 변경 시 순서 유지
     public void Refresh(int amount)
     {
-        gameObject.SetActive(amount > 0);
+        bool visible = amount > 0;
+        if (visible && !gameObject.activeSelf) transform.SetAsLastSibling();
+        if (gameObject.activeSelf != visible) gameObject.SetActive(visible);
         amountText.text = amount.ToString();
         if (hovered && amount > 0) Show();
     }
