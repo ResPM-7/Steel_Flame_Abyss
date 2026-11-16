@@ -101,6 +101,7 @@ MonoBehaviour:
   healthLabel: {fileID: 2891306519128456714}
   statusLabel: {fileID: 6477962730408051934}
   statusIcons: {fileID: 11400000, guid: d35dc4e53979d42449a3afd13e4d393d, type: 2}
+  statusItemPrefab: {fileID: 3412081519545227104, guid: cda2e59fff5d909439eea726173c2c0b, type: 3}
   shieldRoot: {fileID: 916513795418926070}
   shieldLabel: {fileID: 8602341479034140566}
   detailLabel: {fileID: 279052314517606787}

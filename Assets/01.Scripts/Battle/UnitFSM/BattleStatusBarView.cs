@@ -5,6 +5,27 @@ using UnityEngine;
 public class BattleStatusBarView : MonoBehaviour
 {
     private readonly BattleStatusItemView[] items = new BattleStatusItemView[8];
+    private readonly StatusDefinition[] definitions = new StatusDefinition[8];
+    private BattleStatusItemView itemPrefab;
+
+    //효과별 표시 데이터 보관
+    private class StatusDefinition
+    {
+        public string Title;
+        public string Description;
+        public Color Color;
+        public Sprite Sprite;
+        public bool DescriptionOnly;
+
+        public StatusDefinition(string title, string description, Color color, Sprite sprite, bool descriptionOnly = false)
+        {
+            Title = title;
+            Description = description;
+            Color = color;
+            Sprite = sprite;
+            DescriptionOnly = descriptionOnly;
+        }
+    }
     private readonly Vector3[] corners = new Vector3[4];
     private RectTransform tooltip;
     private TMP_Text tooltipText;
@@ -12,8 +33,9 @@ public class BattleStatusBarView : MonoBehaviour
     private TMP_FontAsset font;
 
     //기존 상태 텍스트 위치에 공용 상태 표시 줄 배치
-    public static BattleStatusBarView Create(TMP_Text source, BattleStatusIcons icons = null)
+    public static BattleStatusBarView Create(TMP_Text source, BattleStatusIcons icons, BattleStatusItemView prefab)
     {
+        if (prefab == null) return null;
         RectTransform rect = NewRect("StatusEffects", source.transform.parent);
         RectTransform original = source.rectTransform;
         rect.anchorMin = original.anchorMin;
@@ -30,67 +52,48 @@ public class BattleStatusBarView : MonoBehaviour
         layout.childForceExpandHeight = false;
         var bar = rect.gameObject.AddComponent<BattleStatusBarView>();
         bar.font = source.font;
+        bar.itemPrefab = prefab;
         bar.CreateTooltip(source.GetComponentInParent<Canvas>().rootCanvas);
-        bar.items[0] = bar.CreateItem("화상", "턴 종료 시 수치만큼 방어도를 무시하고 체력 피해.\n발동 후 화상 수치 1 감소.", new Color(0.65f, 0.18f, 0.08f), icons != null ? icons.Burn : null);
-        bar.items[1] = bar.CreateItem("화상\n반격", "적의 공격을 받고 생존하면 공격자에게 수치만큼 화상 부여.\n방어도로 막아도 발동. 다음 자신의 턴 시작 시 해제.", new Color(0.48f, 0.24f, 0.08f), icons != null ? icons.BurnRetaliation : null);
-        bar.items[2] = bar.CreateItem("약화", "공격 피해가 약화 수치만큼 감소.\n자신의 턴 종료 시 전체 해제.", new Color(0.25f, 0.35f, 0.25f), icons != null ? icons.Weak : null);
-        bar.items[3] = bar.CreateItem("취약", "받는 공격 피해 50% 증가.\n수치는 남은 턴. 자신의 턴 종료 시 1 감소.", new Color(0.38f, 0.22f, 0.48f), icons != null ? icons.Vulnerable : null);
-        bar.items[4] = bar.CreateItem("정신\n분열", "수치가 적의 현재 체력 이상이면 처형.\n부여·증가 직후와 턴 종료 화상 처리 후 검사.", new Color(0.24f, 0.16f, 0.42f), icons != null ? icons.MindFracture : null);
-        bar.items[5] = bar.CreateItem("힘", "공격 피해에 힘 수치만큼 추가.", new Color(0.55f, 0.22f, 0.2f), icons != null ? icons.Strength : null);
-        bar.items[6] = bar.CreateItem("힘\n증가", "매 턴 시작 시 힘을 {amount} 얻습니다.\n이번 전투 동안 지속됩니다.", new Color(0.55f, 0.32f, 0.12f), icons != null ? icons.TurnStartStrength : null, true);
-        bar.items[7] = bar.CreateItem("화상\n부여", "매 턴 시작 시 모든 생존 적에게 화상을 {amount} 부여합니다.\n이번 전투 동안 지속됩니다.", new Color(0.65f, 0.25f, 0.08f), icons != null ? icons.TurnStartBurn : null, true);
+        bar.definitions[0] = new StatusDefinition("화상", "턴 종료 시 수치만큼 방어도를 무시하고 체력 피해.\n발동 후 화상 수치 1 감소.", new Color(0.65f, 0.18f, 0.08f), icons != null ? icons.Burn : null);
+        bar.definitions[1] = new StatusDefinition("화상\n반격", "적의 공격을 받고 생존하면 공격자에게 수치만큼 화상 부여.\n방어도로 막아도 발동. 다음 자신의 턴 시작 시 해제.", new Color(0.48f, 0.24f, 0.08f), icons != null ? icons.BurnRetaliation : null);
+        bar.definitions[2] = new StatusDefinition("약화", "공격 피해가 약화 수치만큼 감소.\n자신의 턴 종료 시 전체 해제.", new Color(0.25f, 0.35f, 0.25f), icons != null ? icons.Weak : null);
+        bar.definitions[3] = new StatusDefinition("취약", "받는 공격 피해 50% 증가.\n수치는 남은 턴. 자신의 턴 종료 시 1감소.", new Color(0.38f, 0.22f, 0.48f), icons != null ? icons.Vulnerable : null);
+        bar.definitions[4] = new StatusDefinition("정신\n분열", "수치가 적의 현재 체력 이상이면 처형.", new Color(0.24f, 0.16f, 0.42f), icons != null ? icons.MindFracture : null);
+        bar.definitions[5] = new StatusDefinition("힘", "공격 피해에 힘 수치만큼 추가.", new Color(0.55f, 0.22f, 0.2f), icons != null ? icons.Strength : null);
+        bar.definitions[6] = new StatusDefinition("힘\n증가", "매 턴 시작 시 힘을 {amount} 부여.\n이번 전투 동안 지속.", new Color(0.55f, 0.32f, 0.12f), icons != null ? icons.TurnStartStrength : null, true);
+        bar.definitions[7] = new StatusDefinition("화상\n부여", "매 턴 시작 시 모든 생존 적에게 화상을 {amount} 부여.\n이번 전투 동안 지속.", new Color(0.65f, 0.25f, 0.08f), icons != null ? icons.TurnStartBurn : null, true);
         return bar;
     }
 
     //살아 있는 유닛의 활성 상태만 표시
     public void Refresh(CombatantState state, PlayerBattleState player = null)
     {
-        items[0].Refresh(state.IsAlive ? state.Burn : 0);
-        items[1].Refresh(state.IsAlive ? state.BurnRetaliation : 0);
-        items[2].Refresh(state.IsAlive ? state.Weak : 0);
-        items[3].Refresh(state.IsAlive ? state.Vulnerable : 0);
-        items[4].Refresh(state.IsAlive ? state.MindFracture : 0);
-        items[5].Refresh(state.IsAlive ? state.Strength : 0);
-        items[6].Refresh(state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Strength, TargetType.Self) : 0);
-        items[7].Refresh(state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Burn, TargetType.AllEnemies) : 0);
-        //활성 버프·디버프 수에 따라 기존 영역 안으로 폭 조정
-        int count = 0;
-        foreach (var item in items)
-            if (item.gameObject.activeSelf) count++;
-        float width = count > 0 ? Mathf.Min(100f, (412f - 4f * (count - 1)) / count) : 100f;
-        foreach (var item in items)
-            ((RectTransform)item.transform).sizeDelta = new Vector2(width, 44f);
+        RefreshItem(0, state.IsAlive ? state.Burn : 0);
+        RefreshItem(1, state.IsAlive ? state.BurnRetaliation : 0);
+        RefreshItem(2, state.IsAlive ? state.Weak : 0);
+        RefreshItem(3, state.IsAlive ? state.Vulnerable : 0);
+        RefreshItem(4, state.IsAlive ? state.MindFracture : 0);
+        RefreshItem(5, state.IsAlive ? state.Strength : 0);
+        RefreshItem(6, state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Strength, TargetType.Self) : 0);
+        RefreshItem(7, state.IsAlive && player != null ? player.GetTurnStartAmount(EffectType.Burn, TargetType.AllEnemies) : 0);
     }
 
-    //공용 아이콘과 오른쪽 수치 표시, 미지정 시 이름 표시
-    private BattleStatusItemView CreateItem(string title, string description, Color color, Sprite sprite,
-        bool descriptionOnly = false)
+    //사용 시 최초 생성, 종료 후 비활성 상태로 보관
+    private void RefreshItem(int index, int amount)
     {
-        RectTransform root = NewRect(title.Replace("\n", ""), transform);
-        root.sizeDelta = new Vector2(100f, 44f);
-        var hit = root.gameObject.AddComponent<UnityEngine.UI.Image>();
-        hit.color = new Color(0, 0, 0, 0);
-        RectTransform icon = NewRect("Icon", root);
-        icon.anchorMin = new Vector2(0, 0);
-        icon.anchorMax = new Vector2(0.7f, 1);
-        icon.offsetMin = icon.offsetMax = Vector2.zero;
-        var background = icon.gameObject.AddComponent<UnityEngine.UI.Image>();
-        background.sprite = sprite;
-        background.preserveAspect = true;
-        background.color = sprite != null ? Color.white : color;
-        background.raycastTarget = false;
-        if (sprite == null)
+        BattleStatusItemView item = items[index];
+        if (item == null)
         {
-            TMP_Text label = NewText(icon, 18f);
-            label.text = title;
+            if (amount <= 0) return;
+            StatusDefinition definition = definitions[index];
+            item = Instantiate(itemPrefab, transform, false);
+            item.name = definition.Title.Replace("\n", "");
+            item.gameObject.SetActive(false);
+            item.Initialize(this, definition.Title, definition.Description,
+                definition.Color, definition.Sprite, definition.DescriptionOnly);
+            items[index] = item;
         }
-        TMP_Text number = NewText(root, 22f);
-        number.rectTransform.anchorMin = new Vector2(0.7f, 0);
-        number.text = "0";
-        var item = root.gameObject.AddComponent<BattleStatusItemView>();
-        item.Initialize(this, number, descriptionOnly ? string.Empty : title.Replace("\n", " "), description);
-        root.gameObject.SetActive(false);
-        return item;
+        item.Refresh(amount);
     }
 
     //다른 UI 입력을 가리지 않는 설명창 생성

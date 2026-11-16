@@ -15,6 +15,7 @@ public class BattleCombatantView : MonoBehaviour
     [SerializeField] private TMP_Text statusLabel;
     [Tooltip("플레이어와 적에 같은 공용 아이콘 SO 연결")]
     [SerializeField] private BattleStatusIcons statusIcons;
+    [SerializeField] private BattleStatusItemView statusItemPrefab;
     [Header("방어도 표시")]
     [SerializeField] private GameObject shieldRoot;
     [SerializeField] private TMP_Text shieldLabel;
@@ -129,9 +130,9 @@ public class BattleCombatantView : MonoBehaviour
         if (shieldLabel != null) shieldLabel.text = state.Block.ToString();
 
         //기존 텍스트는 지우고 같은 위치에 버프·디버프 아이콘 표시
-        if (statusLabel != null)
+        if (statusLabel != null && statusItemPrefab != null)
         {
-            if (statusBar == null) statusBar = BattleStatusBarView.Create(statusLabel, statusIcons);
+            if (statusBar == null) statusBar = BattleStatusBarView.Create(statusLabel, statusIcons, statusItemPrefab);
             statusLabel.text = string.Empty;
             statusLabel.enabled = false;
         }
