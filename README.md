@@ -1,7 +1,7 @@
 게임데이터시트 주소
 https://docs.google.com/spreadsheets/d/1z6twBTcf1Y_HKrEMNkVUokgKD0W2Fwu4a7d54ise_Ls/edit?usp=sharing
 
-이 게임은 2D 덱빌딩 로그라이크류 게임입니다.
+이 게임은 Slay the Spire 모작 2D 덱빌딩 로그라이크류 게임입니다.
 
 게임을 시작할때 캐릭터가 3가지가 순서대로 불마법사, 기사, 흑마법사입니다
 
