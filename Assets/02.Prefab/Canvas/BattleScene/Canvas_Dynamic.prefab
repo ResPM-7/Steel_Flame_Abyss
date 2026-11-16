@@ -3211,6 +3211,7 @@ MonoBehaviour:
   healthLabel: {fileID: 5884283962255186104}
   statusLabel: {fileID: 3215645196632028909}
   statusIcons: {fileID: 11400000, guid: d35dc4e53979d42449a3afd13e4d393d, type: 2}
+  statusItemPrefab: {fileID: 3412081519545227104, guid: cda2e59fff5d909439eea726173c2c0b, type: 3}
   shieldRoot: {fileID: 5408170218913783942}
   shieldLabel: {fileID: 3415948216293826136}
   detailLabel: {fileID: 0}

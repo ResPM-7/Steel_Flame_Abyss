@@ -746,3 +746,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleDefeatPopupView
   titleButton: {fileID: 4888410127709460887}
   exitButton: {fileID: 5782010997647078732}
+  canvasGroup: {fileID: 0}
+  animatedPanel: {fileID: 6047148039491823735}
+  showDuration: 0.25
+  hideDuration: 0.18
+  showScale: 0.94
+  hideScale: 0.97

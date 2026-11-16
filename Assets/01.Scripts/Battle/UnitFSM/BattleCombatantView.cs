@@ -15,6 +15,7 @@ public class BattleCombatantView : MonoBehaviour
     [SerializeField] private TMP_Text statusLabel;
     [Tooltip("플레이어와 적에 같은 공용 아이콘 SO 연결")]
     [SerializeField] private BattleStatusIcons statusIcons;
+    [SerializeField] private BattleStatusItemView statusItemPrefab;
     [Header("방어도 표시")]
     [SerializeField] private GameObject shieldRoot;
     [SerializeField] private TMP_Text shieldLabel;
@@ -50,6 +51,7 @@ public class BattleCombatantView : MonoBehaviour
     }
 
     private CombatantState state;
+    private PlayerBattleState playerState;
     private string detail = string.Empty;
     private Color aliveColor;
     private BattleStatusBarView statusBar;
@@ -57,9 +59,12 @@ public class BattleCombatantView : MonoBehaviour
     public CombatantState State => state;
 
     //전투 상태와 표시 데이터 연결 및 초상화 대상 감지 활성화
-    public void Bind(string displayName, Sprite sprite, CombatantState value, GameObject battlePrefab = null, bool faceLeft = false)
+    public void Bind(string displayName, Sprite sprite, CombatantState value, GameObject battlePrefab = null,
+        bool faceLeft = false, bool hideAfterDeath = false, PlayerBattleState player = null)
     {
         if (state != null) state.Changed -= Refresh;
+        if (playerState != null) playerState.Changed -= Refresh;
+        playerState = player;
 
         SetTargetHighlight(false);
         state = value;
@@ -76,13 +81,14 @@ public class BattleCombatantView : MonoBehaviour
         else
         {
             if (unitPortrait == null) unitPortrait = gameObject.AddComponent<BattleUnitPortraitView>();
-            unitPortrait.Bind(portrait, battlePrefab, state, faceLeft);
+            unitPortrait.Bind(portrait, battlePrefab, state, faceLeft, hideAfterDeath);
         }
 
         //인스펙터에 추가한 피해 연출 컴포넌트에 전투 상태 전달
         if (TryGetComponent<BattleDamageFeedback>(out var feedback)) feedback.Bind(state);
 
         if (state != null && isActiveAndEnabled) state.Changed += Refresh;
+        if (playerState != null && isActiveAndEnabled) playerState.Changed += Refresh;
         Refresh();
     }
 
@@ -97,6 +103,7 @@ public class BattleCombatantView : MonoBehaviour
     private void OnEnable()
     {
         if (state != null) state.Changed += Refresh;
+        if (playerState != null) playerState.Changed += Refresh;
         Refresh();
     }
 
@@ -105,6 +112,7 @@ public class BattleCombatantView : MonoBehaviour
     {
         SetTargetHighlight(false);
         if (state != null) state.Changed -= Refresh;
+        if (playerState != null) playerState.Changed -= Refresh;
         if (statusBar != null) statusBar.HideTooltip();
     }
 
@@ -122,13 +130,13 @@ public class BattleCombatantView : MonoBehaviour
         if (shieldLabel != null) shieldLabel.text = state.Block.ToString();
 
         //기존 텍스트는 지우고 같은 위치에 버프·디버프 아이콘 표시
-        if (statusLabel != null)
+        if (statusLabel != null && statusItemPrefab != null)
         {
-            if (statusBar == null) statusBar = BattleStatusBarView.Create(statusLabel, statusIcons);
+            if (statusBar == null) statusBar = BattleStatusBarView.Create(statusLabel, statusIcons, statusItemPrefab);
             statusLabel.text = string.Empty;
             statusLabel.enabled = false;
         }
-        if (statusBar != null) statusBar.Refresh(state);
+        if (statusBar != null) statusBar.Refresh(state, playerState);
         if (portrait != null && playerRender == null && (unitPortrait == null || !unitPortrait.HasVisual))
             portrait.color = state.IsAlive ? aliveColor : new Color(0.3f, 0.3f, 0.3f, 0.5f);
     }

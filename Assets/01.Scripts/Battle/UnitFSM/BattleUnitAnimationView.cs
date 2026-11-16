@@ -13,6 +13,17 @@ public class BattleUnitAnimationView : MonoBehaviour
     private static readonly int Attack = Animator.StringToHash("Attack");
     private static readonly int Hit = Animator.StringToHash("Hit");
 
+    //사망 상태의 첫 재생 완료 확인
+    public bool IsDeathComplete
+    {
+        get
+        {
+            if (animator == null || !animator.isActiveAndEnabled || !animator.GetBool(Die)) return false;
+            var current = animator.GetCurrentAnimatorStateInfo(0);
+            return current.IsName("Base Layer.Dead") && current.normalizedTime >= 1f;
+        }
+    }
+
     //애니메이터 참조 저장
     private void Awake() => animator = GetComponent<Animator>();
 

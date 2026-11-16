@@ -49,13 +49,17 @@ public class BattleCoinInstaller : CoinInstaller
         }
         if (result == BattleResult.Victory && rewardEnemy != null && reward == null)
         {
-            //처치한 편성 전체의 코인 합산, 전투당 한 번 지급
+            //편성 보상 범위에서 전투당 한 번 추첨
             long total = 0;
-            foreach (var enemy in participants.Enemies)
+            if (participants.Encounter != null)
             {
-                int min = Mathf.Max(0, enemy.Data.MinGold);
-                int max = Mathf.Max(min, enemy.Data.MaxGold);
-                total += min + (int)(random.NextDouble() * ((long)max - min + 1));
+                total = RollCoins(participants.Encounter.MinRewardCoins, participants.Encounter.MaxRewardCoins);
+            }
+            else
+            {
+                //편성 없는 단일 적 테스트의 기존 보상 유지
+                foreach (var enemy in participants.Enemies)
+                    total += RollCoins(enemy.Data.MinGold, enemy.Data.MaxGold);
             }
             reward = new CoinReward((int)System.Math.Min(int.MaxValue, total));
         }
@@ -64,6 +68,14 @@ public class BattleCoinInstaller : CoinInstaller
         if (rewardText != null)
             rewardText.text = reward == null ? "Coin" :
                 reward.IsClaimed ? "수령 완료" : $"Coin +{reward.Amount}";
+    }
+
+    //최소와 최대를 포함한 코인 추첨
+    private int RollCoins(int minimum, int maximum)
+    {
+        int min = Mathf.Max(0, minimum);
+        int max = Mathf.Max(min, maximum);
+        return (int)(min + (long)(random.NextDouble() * ((long)max - min + 1)));
     }
 
     //승리 보상 요청 확인과 보유 코인 추가

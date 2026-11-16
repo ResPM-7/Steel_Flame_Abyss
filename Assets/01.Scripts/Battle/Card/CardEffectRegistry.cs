@@ -24,6 +24,8 @@ public class CardEffectRegistry
         registry.Register(EffectType.LoseHealth, new LoseHealthEffectHandler());
         registry.Register(EffectType.Block, new BlockEffectHandler());
         registry.Register(EffectType.Strength, new StrengthEffectHandler());
+        registry.Register(EffectType.TurnStartStrength, new TurnStartCardEffectHandler(EffectType.Strength, TargetType.Self));
+        registry.Register(EffectType.TurnStartBurn, new TurnStartCardEffectHandler(EffectType.Burn, TargetType.AllEnemies));
         registry.Register(EffectType.Weak, new WeakEffectHandler());
         registry.Register(EffectType.Vulnerable, new VulnerableEffectHandler());
         registry.Register(EffectType.Burn, new BurnEffectHandler());

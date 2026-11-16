@@ -10,6 +10,7 @@ public class BattleTurnController : MonoBehaviour
     private bool isResolvingTurn;
     private bool initializeOnStart = true;
     private BattleRelicEffects relicEffects;
+    private readonly CardEffectRegistry turnStartRegistry = CardEffectRegistry.CreateDefault();
 
     //플레이어 턴 시작에 실행할 유물 효과 주입
     public void InjectRelics(BattleRelicEffects effects) => relicEffects = effects;
@@ -107,8 +108,21 @@ public class BattleTurnController : MonoBehaviour
         foreach (var enemy in participants.Enemies)
             enemy.PlanNextAction();
         int drawnCount = deckManager.DrawCards(cardsPerTurn);
+        ApplyTurnStartCardEffects();
         relicEffects?.Apply(RelicTrigger.TurnStart);
         GameLogger.Log($"[턴] 적 행동 완료 / 내 턴 시작 / 새 손패 {drawnCount}장", this);
+    }
+
+    //사용한 카드의 반복 효과 실행, 사망한 적 제외
+    private void ApplyTurnStartCardEffects()
+    {
+        var context = new CardEffectContext(null, deckManager, participants);
+        foreach (var effect in participants.Player.TurnStartEffects)
+        {
+            if (!participants.IsBattleActive) break;
+            if (turnStartRegistry.TryGet(effect.Type, out var handler) && handler.CanApply(effect, context))
+                handler.Apply(effect, context);
+        }
     }
 
     //턴 진행에 필요한 연결 상태 확인

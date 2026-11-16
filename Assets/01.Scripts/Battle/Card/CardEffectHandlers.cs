@@ -73,6 +73,28 @@ public class BurnRetaliationEffectHandler : TargetedCardEffectHandler
     protected override void ApplyToTarget(EffectSpec effect, CardEffectContext context, CombatantState target) => target.ApplyBurnRetaliation(effect.Amount);
 }
 
+//카드 사용 이후 매 턴 시작에 실행할 효과 등록
+public class TurnStartCardEffectHandler : ICardEffectHandler
+{
+    private readonly EffectType appliedType;
+    private readonly TargetType targetType;
+
+    //반복 실행할 효과 종류와 허용 대상 보관
+    public TurnStartCardEffectHandler(EffectType appliedType, TargetType targetType)
+    {
+        this.appliedType = appliedType;
+        this.targetType = targetType;
+    }
+
+    //플레이어 지속 효과의 대상과 수치 검증
+    public bool CanApply(EffectSpec effect, CardEffectContext context) =>
+        effect.Target == targetType && effect.Amount >= 0 && context.Participants.Player != null;
+
+    //즉시 실행 없이 다음 플레이어 턴부터 적용
+    public void Apply(EffectSpec effect, CardEffectContext context) =>
+        context.Participants.Player.AddTurnStartEffect(new EffectSpec(appliedType, effect.Target, effect.Amount));
+}
+
 //플레이어 덱에서 추가 드로우
 public class DrawEffectHandler : ICardEffectHandler
 {

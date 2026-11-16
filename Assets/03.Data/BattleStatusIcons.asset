@@ -18,3 +18,5 @@ MonoBehaviour:
   vulnerable: {fileID: 7888865854599717151, guid: 1133b41506aff954482f918e3e0d22de, type: 3}
   mindFracture: {fileID: 7819613628025069169, guid: 4860a1fbb0e27a44e9115a35fe473d13, type: 3}
   strength: {fileID: -1483206295, guid: 9f79ba15670f1414bb946abe9bdb6a72, type: 3}
+  turnStartStrength: {fileID: 8241007521774154771, guid: b7a57765e328bc14b997a655814759d7, type: 3}
+  turnStartBurn: {fileID: 1562684294904236951, guid: 28cdf4ac3cc3ca341bb5df8a40bad1da, type: 3}

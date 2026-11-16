@@ -57,6 +57,8 @@ public enum EffectType
     LoseHealth = 107,         //방어도와 공격 보정 무시 체력 소모
 
     CardRewardChoiceBonus = 110, //전투 보상 카드 후보 추가
+    TurnStartStrength = 111, //매 턴 시작 힘 획득 등록
+    TurnStartBurn = 112, //매 턴 시작 화상 부여 등록
 
     GoldMultiplier = 199      //골드배율
 }

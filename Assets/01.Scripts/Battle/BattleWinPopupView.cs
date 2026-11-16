@@ -8,9 +8,7 @@ public class BattleWinPopupView : MonoBehaviour
     [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private RectTransform animatedPanel;
     [SerializeField, Min(0.01f)] private float showDuration = 0.25f;
-    [SerializeField, Min(0.01f)] private float hideDuration = 0.18f;
     [SerializeField, Range(0.1f, 1f)] private float showScale = 0.94f;
-    [SerializeField, Range(0.1f, 1f)] private float hideScale = 0.97f;
     private Sequence animationSequence;
     private Vector3 originalScale;
     private bool initialized;
@@ -61,24 +59,18 @@ public class BattleWinPopupView : MonoBehaviour
         });
     }
 
-    //퇴장 완료 후 맵 이동 요청과 실패 시 보상창 복원
-    public void HideAndContinue(System.Func<bool> tryContinue)
+    //퇴장 연출 없이 즉시 맵 이동 요청, 실패 시 입력 복구
+    public void ContinueImmediately(System.Func<bool> tryContinue)
     {
         if (busy || !isActiveAndEnabled || tryContinue == null) return;
         busy = true;
         canvasGroup.interactable = false;
-        //퇴장 중에도 뒤쪽 UI 입력 차단 유지
         canvasGroup.blocksRaycasts = true;
-        animationSequence?.Kill();
-        animationSequence = DOTween.Sequence().SetUpdate(true);
-        animationSequence.Append(canvasGroup.DOFade(0f, hideDuration).SetEase(Ease.InQuad));
-        if (animatedPanel != null)
-            animationSequence.Join(animatedPanel.DOScale(originalScale * hideScale, hideDuration).SetEase(Ease.InQuad));
-        animationSequence.OnComplete(() =>
+        if (!tryContinue() && this != null && isActiveAndEnabled)
         {
-            if (!tryContinue()) ShowAnimated();
-            //이동 성공 시 씬 종료까지 투명한 입력 차단 영역 유지
-        });
+            busy = false;
+            canvasGroup.interactable = true;
+        }
     }
 
     //재사용과 씬 종료 시 트윈 중단 및 기준 상태 복원

@@ -16,6 +16,10 @@ public class BattleStatusIcons : ScriptableObject
     [SerializeField] private Sprite mindFracture;
     [Tooltip("힘")]
     [SerializeField] private Sprite strength;
+    [Tooltip("매 턴 시작 힘 증가")]
+    [SerializeField] private Sprite turnStartStrength;
+    [Tooltip("매 턴 시작 모든 적에게 화상 부여")]
+    [SerializeField] private Sprite turnStartBurn;
 
     public Sprite Burn => burn;
     public Sprite BurnRetaliation => burnRetaliation;
@@ -23,4 +27,6 @@ public class BattleStatusIcons : ScriptableObject
     public Sprite Vulnerable => vulnerable;
     public Sprite MindFracture => mindFracture;
     public Sprite Strength => strength;
+    public Sprite TurnStartStrength => turnStartStrength;
+    public Sprite TurnStartBurn => turnStartBurn;
 }
